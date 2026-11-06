@@ -114,7 +114,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='2 · 2026-11-06';
+var VERSION='3 · 2026-11-06';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -206,6 +206,11 @@ function itemHtml(it,i,hot){
     if(S.post[it.id])b+='<button class="btn" data-act="cpost" data-id="'+esc(it.id)+'">คัดลอกโพสต์</button>';
     b+='<button class="btn pri" data-act="ask" data-id="'+esc(it.id)+'">ถามลุง</button>';
     b+='<button class="btn" data-act="copy" data-id="'+esc(it.id)+'">คัดลอก</button>';
+    
+    // ปุ่มหาคลิป TikTok (เพิ่มใหม่)
+    var tq = encodeURIComponent((it.title_th || it.title || '').trim());
+    b+='<a class="btn" href="https://www.tiktok.com/search?q='+tq+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">🎬 หาคลิป TikTok</a>';
+
     b+='<button class="btn'+(isSaved(it.id)?' on':'')+'" data-act="save" data-id="'+esc(it.id)+'">'+(isSaved(it.id)?'เก็บแล้ว ✓':'เก็บไว้')+'</button></div>';
     b='<div class="nb">'+b+'</div>';
   }
