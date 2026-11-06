@@ -28,10 +28,7 @@ jobs:
         if: steps.cfg.outputs.ready == 'true'
         with:
           node-version: "20"
-      - name: ติดตั้ง clasp
-        if: steps.cfg.outputs.ready == 'true'
-        run: npm install -g @google/clasp@2
-      - name: ตั้งค่า clasp
+      - name: ตั้งค่า clasp (เลือกเวอร์ชันตามรูปแบบรหัสล็อกอิน)
         if: steps.cfg.outputs.ready == 'true'
         env:
           CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
@@ -39,6 +36,19 @@ jobs:
         run: |
           printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
           printf '{"scriptId":"%s","rootDir":"gas"}' "$SCRIPT_ID" > .clasp.json
+          # พิมพ์เฉพาะชื่อคีย์ระดับบน (ไม่พิมพ์ค่า)
+          KEYS=$(node -e 'try{console.log(Object.keys(JSON.parse(require("fs").readFileSync(process.env.HOME+"/.clasprc.json","utf8"))).join(","))}catch(e){console.log("INVALID_JSON")}')
+          echo "รูปแบบ CLASPRC_JSON (ชื่อคีย์): $KEYS"
+          case ",$KEYS," in
+            *,tokens,*) echo "CLASP_VER=3" >> "$GITHUB_ENV" ;;
+            *,token,*) echo "CLASP_VER=2.4.2" >> "$GITHUB_ENV" ;;
+            *) echo "::error::CLASPRC_JSON รูปแบบไม่ถูกต้อง (ต้องเป็นเนื้อไฟล์ ~/.clasprc.json ทั้งไฟล์)"; exit 1 ;;
+          esac
+      - name: ติดตั้ง clasp
+        if: steps.cfg.outputs.ready == 'true'
+        run: |
+          npm install -g "@google/clasp@$CLASP_VER"
+          clasp --version
       - name: push โค้ดขึ้น Apps Script
         if: steps.cfg.outputs.ready == 'true'
         run: clasp push -f
