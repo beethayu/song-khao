@@ -52,6 +52,7 @@ nav button.on svg{stroke:var(--acc)}
 .lung{color:var(--ink);white-space:pre-line;font-size:15px;line-height:1.65;padding-top:10px;border-top:1px solid var(--line)}
 .lh{font-size:12px;color:var(--mut);margin:10px 0 4px;padding-top:10px;border-top:1px solid var(--line)}
 .lh+.lung{border-top:0;padding-top:0}
+.facts{white-space:pre-line;font-size:14px;line-height:1.65;color:var(--ink)}
 .note{font-size:12px;color:var(--mut);margin-top:8px}
 .note a{color:var(--mut)}
 .load{color:var(--warn);font-weight:600;font-size:14px;padding:10px 0}
@@ -191,9 +192,10 @@ async function loadNews(){
 function itemHtml(it,i,hot){
   var op=!!S.open[it.id],b='';
   if(op){
-    if(S.retelling[it.id])b+='<div class="load">ลุงกำลังเล่า…</div>';
-    else if(it.lung)b+='<div class="lh">ลุงเล่า</div><div class="lung">'+esc(it.lung)+'</div>';
-    else b+='<div class="note">ลุงยังไม่ได้เล่าข่าวนี้</div>';
+    var fx=it.facts?'<div class="lh">ข่าวย่อ (สรุปจากแหล่งข่าว)</div><div class="facts">'+esc(it.facts)+'</div>':'';
+    if(S.retelling[it.id])b+=fx+'<div class="load">ลุงกำลังค้นข่าวและเล่า…</div>';
+    else if(it.lung)b+=fx+'<div class="lh">ลุงเล่า</div><div class="lung">'+esc(it.lung)+'</div>';
+    else b+=fx+'<div class="note">ลุงยังไม่ได้เล่าข่าวนี้</div>';
     var link=/^https?:\/\//.test(it.url||'')?' · <a href="'+esc(it.url)+'" target="_blank" rel="noopener">อ่านต้นฉบับ</a>':'';
     b+='<div class="note">ที่มา: '+esc(it.source||'-')+link+'</div><div class="acts">';
     if(!it.lung&&!S.retelling[it.id])b+='<button class="btn acc" data-act="retell" data-id="'+esc(it.id)+'">ให้ลุงเล่า</button>';

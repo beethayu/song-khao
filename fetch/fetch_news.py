@@ -192,6 +192,15 @@ def main():
         print(f"คะแนน รอบ {i + 1}:", r)
         if r.get("left", 0) == 0 or r.get("done", 0) == 0:
             break
+    for i in range(9):  # ค้นข่าวย่อ (Gemini + ค้นเว็บ) ทีละ 4 ข่าว สูงสุด 36 ข่าวต่อรอบ
+        try:
+            r = call("factsPending", [4])
+        except Exception as e:
+            print("ข่าวย่อล้มเหลว:", str(e)[:120])
+            break
+        print(f"ข่าวย่อ รอบ {i + 1}:", r)
+        if r.get("left", 0) == 0 or r.get("done", 0) == 0:
+            break
     for i in range(6):  # ให้ลุงเล่าทีละ 6 ข่าว สูงสุด 36 ข่าวต่อรอบ
         r = call("retellPending", [6])
         print(f"retell รอบ {i + 1}:", r)

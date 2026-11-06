@@ -5,22 +5,36 @@
  */
 
 const SHEET_NAME = 'news';
-const HEAD = ['id', 'region', 'title', 'source', 'url', 'metric', 'score', 'ts', 'snippet', 'lung', 'tag', 'title_th', 'drama', 'sides', 'mood'];
+const HEAD = ['id', 'region', 'title', 'source', 'url', 'metric', 'score', 'ts', 'snippet', 'lung', 'tag', 'title_th', 'drama', 'sides', 'mood', 'facts'];
+const LUNG_VER = '3'; // เปลี่ยนเลขนี้ = ล้างสำนวนลุงเก่าทั้งหมดแล้วเล่าใหม่
 const KEEP_DAYS = 4;
 const MAX_ROWS = 600;
 const MODELS = ['gemini-3.5-flash', 'gemini-3.5-flash-lite'];
 
 const LUNG = [
-  'คุณคือ "ลุง" คนเล่าข่าวสำนวนบ้าน ๆ เป็นกันเอง พูดไทยง่าย ๆ มีมุกเล็กน้อย แทนตัวเองว่า "ลุง" เรียกคนอ่านว่า "หลาน" หรือไม่เรียกก็ได้',
+  'คุณคือ "ลุง" ผู้ชายวัยกลางคนค่อนไปทางสูงวัย คนเล่าข่าวสำนวนบ้าน ๆ พูดตรง ๆ ห้วน ๆ มีอารมณ์ขันแบบแซวหน้านิ่ง ไม่หวาน ไม่เว่อร์ แทนตัวเองว่า "ลุง" เรียกคนอ่านว่า "หลาน" (ใช้พอประมาณ ไม่ต้องทุกประโยค)',
+  'น้ำเสียง: เหมือนลุงนั่งจิบกาแฟหน้าบ้านเล่าข่าวให้ฟัง ใช้คำแนว "เอ้า" "เฮ้อ" "ลุงว่านะ" "เรื่องมันมีอยู่ว่า" "ก็ว่ากันไป" ลงท้ายแบบผู้ชาย (นะ แหละ เนี่ย)',
+  'ห้ามน้ำเสียงป้า/แอดมินเพจบันเทิง: ห้ามใช้ "อุ๊ย" "ต๊ายตาย" "กรี๊ด" "แซ่บ" "ปัง" "เม้นท์" "จ้า" "ค่ะ" "คะ" "ซิ/ทีซิ" ห้ามใช้ emoji และคำแสลงวัยรุ่น',
   'กติกาเหล็ก:',
-  '1) เล่าเฉพาะข้อเท็จจริงที่ได้รับในหัวข้อ/สรุปเท่านั้น ห้ามแต่งรายละเอียด ตัวเลข คำพูด หรือเหตุการณ์เพิ่ม',
+  '1) เล่าเฉพาะข้อเท็จจริงที่ได้รับในหัวข้อ/สรุป/ข่าวย่อเท่านั้น ห้ามแต่งรายละเอียด ตัวเลข คำพูด หรือเหตุการณ์เพิ่ม',
   '2) เรื่องของคนจริง/คดี/อุบัติเหตุ ให้ใช้ "ตามข่าวว่า…" ห้ามตัดสิน กล่าวหา หรือซ้ำเติมใคร',
   '3) ถ้าข้อมูลมีแค่หัวข้อสั้น ๆ ให้เล่าสั้น แล้วบอกตรง ๆ ว่า "ลุงรู้แค่นี้ รายละเอียดตามไปอ่านต้นฉบับนะ"',
   '4) ข่าวเศร้า/เสียชีวิต/เหตุรุนแรง ให้เล่าสุภาพ ไม่เล่นมุก',
   '5) ตอบเป็นข้อความธรรมดา ไม่ใช้สัญลักษณ์ markdown',
   '6) เวลาจิกกัด จิกได้เฉพาะ "สถานการณ์/พฤติกรรม/ระบบ" ห้ามด่าตัวบุคคล ห้ามคำหยาบ ห้ามล้อรูปร่าง เพศ ศาสนา เชื้อชาติ ความพิการ',
   '7) ห้ามแตะหรือเล่นมุกเกี่ยวกับสถาบันพระมหากษัตริย์',
-  '8) เรื่องของคนจริง ห้ามฟันธงว่าใครผิด ให้คนอ่านตัดสินเอง'
+  '8) เรื่องคดี/ข้อกล่าวหา: ข้อเท็จจริงที่ยืนยันแล้ว (ถูกจับ ถูกแจ้งข้อหา ศาลมีคำสั่ง) เล่าตรง ๆ ได้ แต่ถ้ายังไม่มีคำพิพากษา การถูกจับ/ถูกแจ้งข้อหาไม่เท่ากับผิดจริง ' +
+    'ห้ามพูดว่าเขาผิด/โกง/ทำจริงเป็นข้อเท็จจริง ให้ใช้คำว่า "ผู้ต้องหา" "ถูกกล่าวหาว่า" "ตามที่ตำรวจแจ้ง" ถ้าศาลตัดสินแล้วจึงเล่าตามคำพิพากษาได้ ' +
+    'และจิกที่ปฏิกิริยาสังคมหรือสถานการณ์ ไม่จิกตัวผู้ต้องหา'
+].join('\n');
+
+const FACTS_PROMPT = [
+  'คุณเป็นผู้ช่วยกองบรรณาธิการ ใช้การค้นหาเว็บเพื่อหาข่าวตามหัวข้อที่ให้ แล้วเขียน "ข่าวย่อ" ภาษาไทยจากข้อมูลที่ค้นเจอจริง',
+  'รูปแบบ: 5–8 บรรทัดสั้น ๆ แต่ละบรรทัดขึ้นต้นด้วย "• " ครอบคลุม เกิดอะไรขึ้น / ใคร ที่ไหน เมื่อไหร่ / ตัวเลขสำคัญ / ความคืบหน้าล่าสุด / ประเด็นที่คนเถียงกัน',
+  'บรรทัดสุดท้ายเขียนว่า "ที่มา: " ตามด้วยชื่อสำนักข่าวที่ใช้ (ไม่เกิน 3 แห่ง)',
+  'กติกา: เรียบเรียงใหม่ด้วยคำของคุณเอง ห้ามคัดลอกประโยคยาวจากข่าว (ยกคำพูดได้ไม่เกิน 15 คำ) ห้ามเดา ห้ามเติมสิ่งที่ไม่พบ',
+  'เรื่องคดี: ถ้ายังไม่มีคำพิพากษา ให้ใช้ "ผู้ต้องหา" "ถูกกล่าวหาว่า" "ตำรวจแจ้งข้อหา…" ห้ามระบุว่าผิดจริง',
+  'ถ้าค้นไม่พบข่าวนี้ ให้ตอบคำเดียวว่า "ไม่พบ"'
 ].join('\n');
 
 const SCORE_PROMPT = [
@@ -69,6 +83,7 @@ const API = {
   retellPending: retellPending,
   translatePending: translatePending,
   scorePending: scorePending,
+  factsPending: factsPending,
   retell: retell,
   chat: chat
 };
@@ -122,7 +137,8 @@ function pub_(o) {
     id: o.id, region: o.region, title: o.title, source: o.source, url: o.url,
     metric: o.metric, score: Number(o.score) || 0, ts: Number(o.ts) || 0,
     lung: o.lung || '', tag: o.tag || '', title_th: o.title_th || '',
-    drama: dr_(o), sides: o.sides || '', mood: o.mood || ''
+    drama: dr_(o), sides: o.sides || '', mood: o.mood || '',
+    facts: (o.facts && o.facts !== '-') ? String(o.facts) : ''
   };
 }
 
@@ -161,7 +177,7 @@ function ingest(items) {
         upd++;
       } else {
         add.push([it.id, it.region, it.title, it.source || '', it.url || '', it.metric || '',
-          Number(it.score) || 0, now, String(it.snippet || '').slice(0, 600), '', it.tag || '', '', '', '', '']);
+          Number(it.score) || 0, now, String(it.snippet || '').slice(0, 600), '', it.tag || '', '', '', '', '', '']);
         byId[it.id] = { _row: -1 };
       }
     });
@@ -239,16 +255,62 @@ function scorePending(limit) {
   return { done: done, left: Math.max(todo.length - done, 0) };
 }
 
+// ---------- ข่าวย่อ (ค้นเว็บด้วย Gemini แล้วสรุปข้อเท็จจริง) ----------
+function factsText_(o) {
+  const q = 'หัวข้อข่าว: ' + (o.title_th || o.title) + (o.title_th ? '\n(ต้นฉบับ: ' + o.title + ')' : '') +
+    (o.snippet ? '\nข้อมูลเพิ่ม: ' + o.snippet : '') + (o.source ? '\nแหล่งที่เจอหัวข้อ: ' + o.source : '');
+  const t = gemini_(FACTS_PROMPT, [{ role: 'user', parts: [{ text: q }] }], 0.2, false, [{ google_search: {} }]);
+  const s = String(t || '').trim();
+  return (!s || s === 'ไม่พบ' || s.length < 25) ? '-' : s.slice(0, 1800);
+}
+
+function factsPending(limit) {
+  const sh = sheet_();
+  const lim = Math.min(Number(limit) || 4, 6);
+  const since = Date.now() - 2 * 24 * 3600 * 1000;
+  const todo = rows_(sh).filter(function (o) {
+    const d = dr_(o);
+    return o.title && !o.facts && Number(o.ts) >= since && d !== null && d >= 5;
+  });
+  todo.sort(function (a, b) { return rank_(b) - rank_(a); });
+  let done = 0, failed = 0, err = '';
+  todo.slice(0, lim).forEach(function (o) {
+    try {
+      sh.getRange(o._row, 16).setValue(factsText_(o));
+      done++;
+    } catch (e) {
+      failed++;
+      err = String(e && e.message || e).slice(0, 120);
+    }
+  });
+  const r = { done: done, failed: failed, left: Math.max(todo.length - done, 0) };
+  if (err) r.err = err;
+  return r;
+}
+
+function migrateLung_(sh) {
+  const p = PropertiesService.getScriptProperties();
+  if (p.getProperty('LUNG_VER') === LUNG_VER) return;
+  const n = sh.getLastRow() - 1;
+  if (n >= 1) sh.getRange(2, 10, n, 1).clearContent();
+  p.setProperty('LUNG_VER', LUNG_VER);
+}
+
 // ---------- ลุงเล่า ----------
 function retellPending(limit) {
   const sh = sheet_();
+  migrateLung_(sh);
   const lim = Math.min(Number(limit) || 6, 10);
   const since = Date.now() - 2 * 24 * 3600 * 1000;
   const todo = rows_(sh).filter(function (o) {
     const d = dr_(o);
     return !o.lung && o.title && Number(o.ts) >= since && (d === null || d >= 5);
   });
-  todo.sort(function (a, b) { return rank_(b) - rank_(a); });
+  // ข่าวที่มีข่าวย่อแล้วเล่าก่อน (ข้อมูลครบกว่า)
+  todo.sort(function (a, b) {
+    const fa = (a.facts && a.facts !== '-') ? 1 : 0, fb = (b.facts && b.facts !== '-') ? 1 : 0;
+    return fb - fa || rank_(b) - rank_(a);
+  });
   let done = 0, failed = 0;
   todo.slice(0, lim).forEach(function (o) {
     try {
@@ -266,6 +328,12 @@ function retell(id) {
   const o = rows_(sh).filter(function (x) { return x.id === id; })[0];
   if (!o) throw new Error('ไม่พบข่าวนี้ (อาจถูกลบแล้ว)');
   if (o.lung) return o.lung;
+  if (!o.facts) {
+    try {
+      o.facts = factsText_(o);
+      sh.getRange(o._row, 16).setValue(o.facts);
+    } catch (e) { /* ไม่ได้ข่าวย่อ ก็เล่าจากหัวข้อต่อ */ }
+  }
   const t = retellText_(o);
   sh.getRange(o._row, 10).setValue(t);
   return t;
@@ -274,6 +342,7 @@ function retell(id) {
 function newsInfo_(o) {
   return 'หัวข้อ: ' + o.title + (o.title_th ? '\nแปลไทย: ' + o.title_th : '') +
     (o.snippet ? '\nสรุป/ข้อมูลเพิ่ม: ' + o.snippet : '') +
+    (o.facts && o.facts !== '-' ? '\nข่าวย่อ (สรุปจากแหล่งข่าว):\n' + o.facts : '') +
     '\nแหล่ง: ' + (o.source || 'ไม่ระบุ') +
     (o.metric ? '\nความร้อนแรง: ' + o.metric : '');
 }
@@ -287,7 +356,7 @@ function retellText_(o) {
     how = 'ข่าวนี้อ่อนไหว (การเมือง/ศาสนา/ประเด็นแบ่งขั้ว) เล่าเป็นกลาง ไม่เข้าข้างและไม่จิกฝ่ายใดเป็นพิเศษ 3–4 ประโยค ปิดท้ายถามความเห็นแบบเปิด ไม่ชี้นำ';
   } else {
     how = 'เล่าแบบจิก ๆ ขำ ๆ 4–6 ประโยค: เปิดด้วยประโยคสะดุดหู เล่าข้อเท็จจริงสั้น ๆ แล้วจิกกัดที่ตัวสถานการณ์/พฤติกรรม/ระบบ ' +
-      'ปิดท้ายด้วยคำถามให้คนเลือกข้างในคอมเมนต์ 1 ประโยค เช่น "หลานอยู่ทีมไหน…?"' +
+      'ปิดท้ายแบบลุงด้วยคำถามให้คนเลือกข้างในคอมเมนต์ 1 ประโยค เช่น "หลานอยู่ทีมไหน เขียนมาบอกลุงหน่อย"' +
       (o.sides ? '\nฝั่งที่คนน่าจะเถียงกัน: ' + o.sides : '');
   }
   const prompt = 'เล่าข่าวนี้ใหม่ในสำนวนลุง ' + how + '\n\n' + newsInfo_(o);
@@ -319,7 +388,7 @@ function chat(id, text, hist, heads) {
 }
 
 // ---------- Gemini ----------
-function gemini_(system, contents, temp, asJson) {
+function gemini_(system, contents, temp, asJson, tools) {
   const key = PropertiesService.getScriptProperties().getProperty('GEMINI_KEY');
   if (!key) throw new Error('ยังไม่ได้ตั้ง GEMINI_KEY');
   const payload = {
@@ -328,6 +397,7 @@ function gemini_(system, contents, temp, asJson) {
     generationConfig: { temperature: temp, thinkingConfig: { thinkingLevel: 'minimal' } }
   };
   if (asJson) payload.generationConfig.responseMimeType = 'application/json';
+  if (tools) payload.tools = tools;
   for (let m = 0; m < MODELS.length; m++) {
     for (let t = 0; t < 2; t++) {
       const res = UrlFetchApp.fetch(
@@ -344,7 +414,9 @@ function gemini_(system, contents, temp, asJson) {
         if (txt) return txt;
       }
       if (code === 400 || code === 401 || code === 403) {
-        throw new Error('Gemini ปฏิเสธคำขอ (เช็ก GEMINI_KEY)');
+        let msg = '';
+        try { msg = String(JSON.parse(res.getContentText()).error.message || '').slice(0, 100); } catch (e) { /* ignore */ }
+        throw new Error('Gemini ปฏิเสธคำขอ ' + code + (msg ? ': ' + msg : ''));
       }
       Utilities.sleep(1500 + Math.floor(Math.random() * 1000));
     }
