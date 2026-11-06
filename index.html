@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12384a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ส่งข่าว">
+<title>ส่งข่าว</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--pri:#12384a;--acc:#ff7a1a;--bg:#f2f4f6;--card:#fff;--ink:#1b2a33;--mut:#74838d;--line:#e3e8eb;--ok:#1f9d55;--warn:#d9822b;--bad:#d64545;--nav:58px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--pri);overscroll-behavior:none}
+body{font-family:'IBM Plex Sans Thai',system-ui,-apple-system,sans-serif;color:var(--ink);font-size:15px;line-height:1.55}
+button,input,textarea{font:inherit;color:inherit}
+button{border:0;background:none;padding:0;cursor:pointer}
+#sbar{position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:var(--pri);z-index:60}
+#app{position:fixed;top:env(safe-area-inset-top);left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+header{flex:none;background:var(--pri);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px}
+header .t{flex:1;min-width:0}
+header h1{margin:0;font-size:20px;font-weight:700;line-height:1.2}
+header .s{font-size:12px;opacity:.75;margin-top:2px}
+#rf{width:40px;height:40px;border-radius:20px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;color:#fff}
+#rf svg{width:22px;height:22px}
+#rf.spin svg{animation:sp 1s linear infinite}
+body[data-tab=saved] #rf,body[data-tab=set] #rf{visibility:hidden}
+body[data-tab=chat] header{display:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+#page{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px 24px}
+body[data-tab=chat] #page{padding:0 12px 96px}
+nav{flex:none;display:flex;background:#fff;border-top:1px solid var(--line);height:calc(var(--nav) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--mut);font-size:11px;font-weight:500}
+nav button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--pri);font-weight:700}
+nav button.on svg{stroke:var(--acc)}
+.n{background:var(--card);border-radius:14px;margin-bottom:10px;box-shadow:0 1px 2px rgba(18,56,74,.06);overflow:hidden}
+.nh{display:flex;gap:12px;padding:13px 14px;width:100%;text-align:left;align-items:flex-start}
+.rk{flex:none;width:26px;height:26px;border-radius:13px;background:var(--bg);color:var(--mut);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.rk.hot{background:var(--acc);color:#fff}
+.nt{flex:1;min-width:0}
+.lab{font-size:12px;color:var(--mut);font-weight:500}
+.ttl{font-size:17px;font-weight:700;line-height:1.4;margin:1px 0 3px;color:var(--ink)}
+.sub{font-size:12px;color:var(--mut)}
+.nb{padding:0 14px 14px 52px}
+.lung{color:var(--ink);white-space:pre-line;font-size:15px;line-height:1.65;padding-top:10px;border-top:1px solid var(--line)}
+.lh{font-size:12px;color:var(--mut);margin:10px 0 4px;padding-top:10px;border-top:1px solid var(--line)}
+.lh+.lung{border-top:0;padding-top:0}
+.note{font-size:12px;color:var(--mut);margin-top:8px}
+.note a{color:var(--mut)}
+.load{color:var(--warn);font-weight:600;font-size:14px;padding:10px 0}
+.acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.btn{height:38px;padding:0 14px;border-radius:19px;background:var(--bg);color:var(--pri);font-weight:600;font-size:14px}
+.btn.pri{background:var(--pri);color:#fff}
+.btn.acc{background:var(--acc);color:#fff}
+.btn.on{background:#fff1e6;color:var(--acc)}
+.btn:disabled{opacity:.5}
+.card{background:var(--card);border-radius:14px;margin-bottom:12px;overflow:hidden}
+.pad{padding:14px}
+.row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row label{flex:none;width:84px;font-weight:600;font-size:14px}
+.row input{flex:1;min-width:0;border:0;outline:0;background:none;text-align:right;font-size:16px;padding:6px 0;color:var(--ink)}
+.h2{font-size:17px;font-weight:700;margin:0 0 4px}
+.hint{font-size:13px;color:var(--mut)}
+.empty{text-align:center;padding:28px 18px}
+.chead{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 0 8px;display:flex;gap:8px;align-items:center}
+.chip{flex:1;min-width:0;background:#fff;border-radius:18px;padding:7px 14px;font-size:13px;color:var(--pri);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px}
+.chip span{overflow:hidden;text-overflow:ellipsis}
+.chip b{flex:none;color:var(--mut);font-size:16px;font-weight:500;padding:0 2px}
+.cclr{flex:none;font-size:12px;color:var(--mut);padding:8px 4px}
+.b{max-width:88%;padding:10px 14px;border-radius:16px;margin:8px 0;font-size:15px;line-height:1.6;word-break:break-word}
+.b.u{margin-left:auto;background:var(--pri);color:#fff;border-bottom-right-radius:4px;white-space:pre-wrap}
+.b.a{background:#fff;color:var(--ink);border-bottom-left-radius:4px}
+.ch-ai{white-space:pre-line}
+.b.err{background:#fdecec;color:var(--bad);font-size:13px}
+.sugg{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.sugg button{background:#fff;border-radius:18px;padding:8px 14px;font-size:14px;color:var(--pri);font-weight:500}
+#comp{display:none;position:fixed;left:0;right:0;bottom:calc(var(--nav) + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);padding:8px 10px;gap:8px;align-items:flex-end;z-index:30}
+body[data-tab=chat] #comp{display:flex}
+#msg{flex:1;min-width:0;resize:none;border:0;outline:0;background:var(--bg);border-radius:18px;padding:9px 14px;font-size:16px;line-height:1.4;max-height:110px}
+#snd{flex:none;height:40px;padding:0 18px;border-radius:20px;background:var(--acc);color:#fff;font-weight:700}
+#snd:disabled{opacity:.5}
+#toast{position:fixed;left:16px;right:16px;bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 12px);background:rgba(27,42,51,.94);color:#fff;font-size:13px;padding:10px 14px;border-radius:12px;z-index:40;display:none;text-align:center}
+body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 70px)}
+</style>
+</head>
+<body data-tab="th">
+<div id="sbar"></div>
+<div id="app">
+  <header>
+    <div class="t"><h1 id="ttl">ข่าวไทย</h1><div class="s" id="sub"></div></div>
+    <button id="rf" aria-label="รีเฟรช"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4"/></svg></button>
+  </header>
+  <div id="page"></div>
+  <nav>
+    <button data-tab="th"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>ไทย</button>
+    <button data-tab="world"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>โลก</button>
+    <button data-tab="saved"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>เก็บไว้</button>
+    <button data-tab="chat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>แชท</button>
+    <button data-tab="set"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>ตั้งค่า</button>
+  </nav>
+</div>
+<div id="comp"><textarea id="msg" rows="1" placeholder="ถามลุงเรื่องข่าว…"></textarea><button id="snd">ส่ง</button></div>
+<div id="toast"></div>
+<script>
+(function(){
+'use strict';
+var VERSION='1 · 2026-11-06';
+var DEFAULT_URL='';
+var $=function(s){return document.querySelector(s)};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+var LS={
+  get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+  set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+};
+var TABS={th:'ข่าวไทย',world:'ข่าวโลก',saved:'เก็บไว้',chat:'แชท',set:'ตั้งค่า'};
+var S={
+  tab:LS.get('sk_tab','th'),
+  news:LS.get('sk_news',{th:[],world:[],at:0}),
+  saved:LS.get('sk_saved',[]),
+  chat:LS.get('sk_chat',[]),
+  ctx:null,tst:{t:'',c:''},busy:0,open:{},retelling:{},loading:false,sending:false,chatErr:'',wipeArm:false
+};
+if(!TABS[S.tab]||S.tab==='chat')S.tab='th';
+
+function cfg(){var c=LS.get('sk_cfg',{});return {url:c.url||DEFAULT_URL,key:c.key||''}}
+function ago(ts){
+  var m=Math.round((Date.now()-ts)/60000);
+  if(m<1)return 'เมื่อกี้';
+  if(m<60)return m+' นาทีที่แล้ว';
+  var h=Math.round(m/60);
+  if(h<24)return h+' ชม.ที่แล้ว';
+  return Math.round(h/24)+' วันที่แล้ว';
+}
+function hhmm(ts){var d=new Date(ts);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+function toast(t){var el=$('#toast');el.textContent=t;el.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(function(){el.style.display='none'},3500)}
+
+// ---------- API ----------
+async function api(fn,args,ms){
+  var c=cfg();
+  if(!c.url||!c.key)throw new Error('ยังไม่ได้ตั้ง API ไปที่แท็บตั้งค่า');
+  S.busy++;
+  var ac=new AbortController();
+  var to=setTimeout(function(){ac.abort()},ms||60000);
+  try{
+    var r=await fetch(c.url,{method:'POST',body:JSON.stringify({fn:fn,args:args||[],k:c.key}),headers:{'Content-Type':'text/plain;charset=utf-8'},signal:ac.signal,redirect:'follow'});
+    var j=await r.json();
+    if(!j.ok)throw new Error(j.error||'ผิดพลาด');
+    return j.result;
+  }catch(e){
+    if(e&&e.name==='AbortError')throw new Error('รอนานเกินไป ลองใหม่อีกครั้ง');
+    if(e instanceof TypeError)throw new Error('เน็ตมีปัญหา ลองใหม่อีกครั้ง');
+    throw e;
+  }finally{clearTimeout(to);S.busy--}
+}
+
+// ---------- ข้อมูล ----------
+function find(id){
+  var all=S.news.th.concat(S.news.world,S.saved);
+  for(var i=0;i<all.length;i++)if(all[i].id===id)return all[i];
+  return null;
+}
+function isSaved(id){return S.saved.some(function(x){return x.id===id})}
+function setLung(id,t){
+  [S.news.th,S.news.world,S.saved].forEach(function(l){l.forEach(function(x){if(x.id===id)x.lung=t})});
+  LS.set('sk_news',S.news);LS.set('sk_saved',S.saved);
+}
+async function loadNews(){
+  if(S.loading)return;
+  var c=cfg();
+  if(!c.url||!c.key){render(true);return}
+  S.loading=true;$('#rf').classList.add('spin');
+  try{
+    var r=await Promise.all([api('list',['th',40]),api('list',['world',40])]);
+    S.news={th:r[0],world:r[1],at:Date.now()};
+    LS.set('sk_news',S.news);
+    S.saved.forEach(function(s){var f=find(s.id);if(f&&f!==s&&f.lung)s.lung=f.lung});
+    LS.set('sk_saved',S.saved);
+  }catch(e){toast('โหลดไม่ได้: '+e.message+' (แสดงข่าวที่เก็บไว้)')}
+  S.loading=false;$('#rf').classList.remove('spin');render(true);
+}
+
+// ---------- วาด ----------
+function itemHtml(it,i,hot){
+  var op=!!S.open[it.id],b='';
+  if(op){
+    if(S.retelling[it.id])b+='<div class="load">ลุงกำลังเล่า…</div>';
+    else if(it.lung)b+='<div class="lh">ลุงเล่า</div><div class="lung">'+esc(it.lung)+'</div>';
+    else b+='<div class="note">ลุงยังไม่ได้เล่าข่าวนี้</div>';
+    var link=/^https?:\/\//.test(it.url||'')?' · <a href="'+esc(it.url)+'" target="_blank" rel="noopener">อ่านต้นฉบับ</a>':'';
+    b+='<div class="note">ที่มา: '+esc(it.source||'-')+link+'</div><div class="acts">';
+    if(!it.lung&&!S.retelling[it.id])b+='<button class="btn acc" data-act="retell" data-id="'+esc(it.id)+'">ให้ลุงเล่า</button>';
+    b+='<button class="btn pri" data-act="ask" data-id="'+esc(it.id)+'">ถามลุง</button>';
+    b+='<button class="btn" data-act="copy" data-id="'+esc(it.id)+'">คัดลอก</button>';
+    b+='<button class="btn'+(isSaved(it.id)?' on':'')+'" data-act="save" data-id="'+esc(it.id)+'">'+(isSaved(it.id)?'เก็บแล้ว ✓':'เก็บไว้')+'</button></div>';
+    b='<div class="nb">'+b+'</div>';
+  }
+  return '<div class="n"><button class="nh" data-act="tog" data-id="'+esc(it.id)+'"><span class="rk'+(hot?' hot':'')+'">'+(i+1)+'</span><span class="nt"><div class="lab">'+esc(it.metric||it.tag||'')+'</div><div class="ttl">'+esc(it.title)+'</div><div class="sub">'+esc(it.source||'')+(it.ts?' · อัปเดต '+ago(it.ts):'')+'</div></span></button>'+b+'</div>';
+}
+function listHtml(list,mode){
+  var c=cfg();
+  if(mode!=='saved'&&(!c.url||!c.key))return '<div class="card empty"><div class="h2">เริ่มใช้งาน</div><div class="hint" style="margin-bottom:14px">ใส่ API URL กับ API KEY ในแท็บตั้งค่าก่อน แล้วข่าวจะขึ้นที่นี่</div><button class="btn pri" data-act="go" data-id="set">ไปตั้งค่า</button></div>';
+  if(!list.length){
+    if(mode==='saved')return '<div class="card empty"><div class="h2">ยังไม่มีข่าวที่เก็บไว้</div><div class="hint">กดเปิดข่าว แล้วกด "เก็บไว้" เพื่อเก็บเป็นวัตถุดิบทำคอนเทนต์</div></div>';
+    return '<div class="card empty"><div class="h2">ยังไม่มีข่าว</div><div class="hint">ตัวดึงข่าวทำงานทุก 2 ชั่วโมง กดปุ่มรีเฟรชด้านบนเพื่อโหลดใหม่</div></div>';
+  }
+  return list.map(function(it,i){return itemHtml(it,i,mode!=='saved'&&i<3)}).join('');
+}
+function chatHtml(){
+  var h='<div class="chead">';
+  h+=S.ctx?'<div class="chip"><span>คุยเรื่อง: '+esc(S.ctx.title)+'</span><b data-act="clrctx">✕</b></div>':'<div class="chip"><span>คุยทั่วไป (ลุงรู้หัวข้อข่าวในหน้าแอป)</span></div>';
+  if(S.chat.length)h+='<button class="cclr" data-act="clrchat">ล้างแชท</button>';
+  h+='</div>';
+  if(!S.chat.length&&!S.sending){
+    var sg=S.ctx?['ช่วยคิดแคปชั่นให้ข่าวนี้','มุมไหนน่าเอาไปทำคลิปสั้น','สรุปให้สั้นกว่านี้อีก']:['วันนี้ข่าวไหนน่าเอามาทำคอนเทนต์','เล่าข่าวที่ร้อนสุดให้ฟังหน่อย','มีข่าวไหนคนน่าจะเถียงกันเยอะ'];
+    h+='<div class="hint" style="padding:8px 4px">ถามลุงได้เลย ลุงรู้เฉพาะข่าวที่เห็นในแอป ไม่รู้เกินนั้นจะบอกตรง ๆ</div><div class="sugg">'+sg.map(function(t){return '<button data-act="chip" data-id="'+esc(t)+'">'+esc(t)+'</button>'}).join('')+'</div>';
+  }
+  S.chat.forEach(function(m){h+='<div class="b '+(m.r==='u'?'u':'a ch-ai')+'">'+esc(m.t)+'</div>'});
+  if(S.sending)h+='<div class="b a load">ลุงกำลังคิด…</div>';
+  if(S.chatErr)h+='<div class="b a err">'+esc(S.chatErr)+' (ข้อความเดิมอยู่ในช่องพิมพ์ กดส่งใหม่ได้)</div>';
+  return h;
+}
+function setHtml(){
+  var c=cfg();
+  return '<div class="card"><div class="row"><label>API URL</label><input id="cu" value="'+esc(c.url)+'" placeholder="https://script.google.com/…" autocapitalize="off" autocorrect="off" spellcheck="false"></div><div class="row"><label>API KEY</label><input id="ck" type="password" value="'+esc(c.key)+'" placeholder="รหัสที่ตั้งไว้" autocapitalize="off" autocorrect="off"></div></div>'+
+  '<div class="acts" style="margin:0 0 6px"><button class="btn pri" data-act="test">ทดสอบการเชื่อมต่อ</button></div><div class="note" id="tst" style="margin:0 4px 16px;color:'+(S.tst.c||'var(--mut)')+'">'+esc(S.tst.t)+'</div>'+
+  '<div class="card pad"><div class="h2">ลุงใช้ Gemini</div><div class="hint">ข่าวที่ลุงเล่าแล้วเก็บไว้ในชีตและในเครื่อง เปิดอ่านได้แม้ไม่ได้ใช้ Claude ส่วนแชทต้องใช้ Gemini ผ่านหลังบ้าน</div></div>'+
+  '<div class="card pad"><div class="h2">ข้อมูลในเครื่อง</div><div class="hint" style="margin-bottom:10px">ข่าวที่เก็บไว้ '+S.saved.length+' · ข้อความแชท '+S.chat.length+'</div><button class="btn" data-act="wipe">'+(S.wipeArm?'แตะอีกครั้งเพื่อยืนยันล้าง':'ล้างข้อมูลในเครื่อง')+'</button></div>'+
+  '<div class="note" style="text-align:center">ส่งข่าว · เวอร์ชัน '+VERSION+'</div>';
+}
+function render(keep){
+  var p=$('#page'),top=p.scrollTop;
+  document.body.setAttribute('data-tab',S.tab);
+  Array.prototype.forEach.call(document.querySelectorAll('nav button'),function(b){b.classList.toggle('on',b.getAttribute('data-tab')===S.tab)});
+  $('#ttl').textContent=TABS[S.tab];
+  var n=(S.tab==='th'||S.tab==='world')?S.news[S.tab].length:0;
+  $('#sub').textContent=S.tab==='th'||S.tab==='world'?(S.news.at?'อัปเดต '+hhmm(S.news.at)+' · '+n+' ข่าว':'ยังไม่เคยโหลด'):S.tab==='saved'?S.saved.length+' ข่าว':'';
+  var h;
+  if(S.tab==='chat')h=chatHtml();
+  else if(S.tab==='set')h=setHtml();
+  else if(S.tab==='saved')h=listHtml(S.saved,'saved');
+  else h=listHtml(S.news[S.tab],S.tab);
+  p.innerHTML=h;
+  if(S.tab==='chat'){p.scrollTop=p.scrollHeight}
+  else p.scrollTop=keep?top:0;
+  $('#snd').disabled=S.sending;
+}
+
+// ---------- การกระทำ ----------
+function clip(t){
+  if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(t);
+  return new Promise(function(res,rej){
+    var ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;left:-9999px;top:0;font-size:16px';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy')?res():rej()}catch(e){rej(e)}
+    document.body.removeChild(ta);
+  });
+}
+async function doRetell(id){
+  if(S.retelling[id])return;
+  S.retelling[id]=1;render(true);
+  try{setLung(id,await api('retell',[id],120000))}catch(e){toast(e.message)}
+  delete S.retelling[id];render(true);
+}
+async function send(text){
+  text=(text||'').trim();
+  if(!text||S.sending)return;
+  S.sending=true;S.chatErr='';
+  var hist=S.chat.slice(-8);
+  S.chat.push({r:'u',t:text});LS.set('sk_chat',S.chat.slice(-30));
+  $('#msg').value='';grow();render();
+  var heads=S.news.th.slice(0,6).concat(S.news.world.slice(0,6)).map(function(x){return x.title});
+  try{
+    var r=await api('chat',[S.ctx?S.ctx.id:'',text,hist,heads],120000);
+    S.chat.push({r:'a',t:r});
+  }catch(e){
+    S.chatErr=e.message;S.chat.pop();$('#msg').value=text;grow();
+  }
+  LS.set('sk_chat',S.chat.slice(-30));
+  S.sending=false;render();
+}
+function grow(){var m=$('#msg');m.style.height='auto';m.style.height=Math.min(m.scrollHeight,110)+'px'}
+function go(tab){S.tab=tab;if(tab!=='chat')LS.set('sk_tab',tab);render()}
+
+var ACT={
+  tog:function(id){S.open[id]=!S.open[id];render(true)},
+  retell:function(id){doRetell(id)},
+  ask:function(id){var it=find(id);if(!it)return;S.ctx={id:id,title:it.title};S.chatErr='';go('chat')},
+  copy:function(id,btn){
+    var it=find(id);if(!it)return;
+    var t=(it.lung||it.title)+'\n\n(ที่มา: '+(it.source||'-')+(it.url?' '+it.url:'')+')';
+    clip(t).then(function(){btn.textContent='คัดลอกแล้ว ✓';setTimeout(function(){btn.textContent='คัดลอก'},1500)},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่ข้อความ')});
+  },
+  save:function(id){
+    var i=-1;S.saved.forEach(function(x,k){if(x.id===id)i=k});
+    if(i>=0)S.saved.splice(i,1);
+    else{var it=find(id);if(it)S.saved.unshift(JSON.parse(JSON.stringify(it)))}
+    LS.set('sk_saved',S.saved);render(true);
+  },
+  go:function(id){go(id)},
+  chip:function(id){send(id)},
+  clrctx:function(){S.ctx=null;render()},
+  clrchat:function(){S.chat=[];S.chatErr='';LS.set('sk_chat',[]);render()},
+  test:async function(){
+    saveCfg();S.tst={t:'กำลังทดสอบ…',c:''};render(true);
+    try{await api('ping',[],30000);S.tst={t:'เชื่อมต่อได้ ✓ โหลดข่าวให้แล้ว ดูที่แท็บไทย/โลก',c:'var(--ok)'};loadNews()}
+    catch(e){S.tst={t:e.message,c:'var(--bad)'}}
+    render(true);
+  },
+  wipe:function(){
+    if(!S.wipeArm){S.wipeArm=true;render(true);return}
+    ['sk_news','sk_saved','sk_chat','sk_tab'].forEach(function(k){try{localStorage.removeItem(k)}catch(e){}});
+    S.news={th:[],world:[],at:0};S.saved=[];S.chat=[];S.ctx=null;S.wipeArm=false;render();toast('ล้างแล้ว (รหัส API ยังอยู่)');
+  }
+};
+function saveCfg(){
+  var u=$('#cu'),k=$('#ck');
+  if(u&&k)LS.set('sk_cfg',{url:u.value.trim(),key:k.value.trim()});
+}
+
+$('#page').addEventListener('click',function(e){
+  var a=e.target.closest('[data-act]');
+  if(!a)return;
+  var f=ACT[a.getAttribute('data-act')];
+  if(f)f(a.getAttribute('data-id'),a);
+});
+$('#page').addEventListener('change',function(e){if(e.target.id==='cu'||e.target.id==='ck')saveCfg()});
+Array.prototype.forEach.call(document.querySelectorAll('nav button'),function(b){b.addEventListener('click',function(){S.wipeArm=false;go(b.getAttribute('data-tab'))})});
+$('#rf').addEventListener('click',function(){loadNews()});
+$('#snd').addEventListener('click',function(){send($('#msg').value)});
+$('#msg').addEventListener('input',grow);
+
+// ---------- อัปเดตตัวเอง (ห้ามโหลดใหม่ระหว่างรอ API/พิมพ์) ----------
+function hash(t){var h=5381;for(var i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return String(h)}
+async function checkUpdate(){
+  var ae=document.activeElement;
+  if(S.busy||S.sending||S.loading||(ae&&/^(INPUT|TEXTAREA)$/.test(ae.tagName)&&ae.value))return;
+  try{
+    var r=await fetch(location.pathname+'?_='+Date.now(),{cache:'no-store'});
+    if(!r.ok)return;
+    var h=hash(await r.text()),prev=LS.get('sk_hash',null);
+    LS.set('sk_hash',h);
+    if(prev&&prev!==h)location.reload();
+  }catch(e){}
+}
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState!=='visible')return;
+  checkUpdate();
+  if(Date.now()-(S.news.at||0)>10*60*1000)loadNews();
+});
+
+render();
+checkUpdate();
+if(Date.now()-(S.news.at||0)>10*60*1000)loadNews();
+})();
+</script>
+</body>
+</html>

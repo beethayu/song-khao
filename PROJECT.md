@@ -33,7 +33,10 @@ index.html (GitHub Pages)  → POST text/plain {fn,args,k} → {ok,result}
 - แชท: ใช้ข่าวที่เลือก + หัวข้อข่าวในหน้า เป็นบริบท ห้ามแต่งตัวเลข
 
 ## สถานะล่าสุด
-- (รอบ 1) เขียนโค้ดครบ: หลังบ้าน, ตัวดึงข่าว, workflows, หน้าเว็บ — **ยังไม่ได้ deploy/ทดสอบกับข้อมูลจริง**
+- (รอบ 1, 2026-11-06) เขียนโค้ดครบ: gas/Code.gs, fetch/fetch_news.py, 2 workflows, index.html (แท็บ ไทย/โลก/เก็บไว้/แชท/ตั้งค่า)
+- ทดสอบแล้ว: หน้าเว็บด้วย playwright 390×844 + API จำลอง (เปิดข่าว/ให้ลุงเล่า/แชท/เก็บ/ตั้งค่าผ่าน) · ตัวอ่าน Trends ด้วย XML จำลอง · syntax gas/py/js
+- **ยังไม่เคยทดสอบกับของจริง**: การดึง RSS/Reddit, Gemini (ชื่อรุ่น gemini-3.5-flash / -flash-lite + thinkingLevel minimal จากสกิล — ถ้า 400 ให้ลองปรับ), clasp deploy, Pages
+- deploy-gas ถ้ายังไม่มี Secrets จะข้ามพร้อมคำเตือน (ไม่ล้ม)
 - รอผู้ใช้: สร้าง Apps Script โปรเจกต์ใหม่ + ตั้ง Secrets + Script Properties + deploy web app + เปิด Pages (ดูขั้นตอนด้านล่าง)
 
 ## ขั้นที่ผู้ใช้ต้องทำ (Claude ทำเองไม่ได้)

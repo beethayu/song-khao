@@ -1,0 +1,54 @@
+name: deploy-gas
+
+on:
+  push:
+    branches: [main]
+    paths: ["gas/**", ".github/workflows/deploy-gas.yml"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: เช็ก Secrets
+        id: cfg
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$SCRIPT_ID" ]; then
+            echo "::warning::ยังไม่ได้ตั้ง Secret CLASPRC_JSON / SCRIPT_ID ข้ามการ deploy (ตั้งแล้วกด Run workflow ใหม่)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.cfg.outputs.ready == 'true'
+        with:
+          node-version: "20"
+      - name: ติดตั้ง clasp
+        if: steps.cfg.outputs.ready == 'true'
+        run: npm install -g @google/clasp@2
+      - name: ตั้งค่า clasp
+        if: steps.cfg.outputs.ready == 'true'
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+        run: |
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+          printf '{"scriptId":"%s","rootDir":"gas"}' "$SCRIPT_ID" > .clasp.json
+      - name: push โค้ดขึ้น Apps Script
+        if: steps.cfg.outputs.ready == 'true'
+        run: clasp push -f
+      - name: deploy เว็บแอป (ถ้ามี DEPLOYMENT_ID)
+        if: steps.cfg.outputs.ready == 'true'
+        env:
+          DEPLOYMENT_ID: ${{ secrets.DEPLOYMENT_ID }}
+        run: |
+          if [ -n "$DEPLOYMENT_ID" ]; then
+            clasp deploy -i "$DEPLOYMENT_ID" -d "auto $(date -u +%F-%H%M)" > /dev/null && echo "deploy แล้ว"
+          else
+            echo "ยังไม่มี DEPLOYMENT_ID ข้ามขั้น deploy"
+          fi
