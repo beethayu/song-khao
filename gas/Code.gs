@@ -29,12 +29,12 @@ const LUNG = [
 ].join('\n');
 
 const FACTS_PROMPT = [
-  'คุณเป็นผู้ช่วยกองบรรณาธิการ ใช้การค้นหาเว็บเพื่อหาข่าวตามหัวข้อที่ให้ แล้วเขียน "ข่าวย่อ" ภาษาไทยจากข้อมูลที่ค้นเจอจริง',
+  'คุณเป็นผู้ช่วยกองบรรณาธิการ อ่านเนื้อข่าวที่ให้ แล้วเขียน "ข่าวย่อ" ภาษาไทยจากเนื้อหานั้นเท่านั้น',
   'รูปแบบ: 5–8 บรรทัดสั้น ๆ แต่ละบรรทัดขึ้นต้นด้วย "• " ครอบคลุม เกิดอะไรขึ้น / ใคร ที่ไหน เมื่อไหร่ / ตัวเลขสำคัญ / ความคืบหน้าล่าสุด / ประเด็นที่คนเถียงกัน',
-  'บรรทัดสุดท้ายเขียนว่า "ที่มา: " ตามด้วยชื่อสำนักข่าวที่ใช้ (ไม่เกิน 3 แห่ง)',
+  'บรรทัดสุดท้ายเขียนว่า "ที่มา: " ตามด้วยชื่อแหล่งข่าวที่ให้ไว้',
   'กติกา: เรียบเรียงใหม่ด้วยคำของคุณเอง ห้ามคัดลอกประโยคยาวจากข่าว (ยกคำพูดได้ไม่เกิน 15 คำ) ห้ามเดา ห้ามเติมสิ่งที่ไม่พบ',
   'เรื่องคดี: ถ้ายังไม่มีคำพิพากษา ให้ใช้ "ผู้ต้องหา" "ถูกกล่าวหาว่า" "ตำรวจแจ้งข้อหา…" ห้ามระบุว่าผิดจริง',
-  'ถ้าค้นไม่พบข่าวนี้ ให้ตอบคำเดียวว่า "ไม่พบ"'
+  'ถ้าเนื้อหาไม่ใช่ข่าวหรืออ่านไม่รู้เรื่อง ให้ตอบคำเดียวว่า "ไม่พบ"'
 ].join('\n');
 
 const SCORE_PROMPT = [
@@ -83,7 +83,8 @@ const API = {
   retellPending: retellPending,
   translatePending: translatePending,
   scorePending: scorePending,
-  factsPending: factsPending,
+  needFacts: needFacts,
+  factsFromText: factsFromText,
   retell: retell,
   chat: chat
 };
@@ -255,37 +256,40 @@ function scorePending(limit) {
   return { done: done, left: Math.max(todo.length - done, 0) };
 }
 
-// ---------- ข่าวย่อ (ค้นเว็บด้วย Gemini แล้วสรุปข้อเท็จจริง) ----------
-function factsText_(o) {
-  const q = 'หัวข้อข่าว: ' + (o.title_th || o.title) + (o.title_th ? '\n(ต้นฉบับ: ' + o.title + ')' : '') +
-    (o.snippet ? '\nข้อมูลเพิ่ม: ' + o.snippet : '') + (o.source ? '\nแหล่งที่เจอหัวข้อ: ' + o.source : '');
-  const t = gemini_(FACTS_PROMPT, [{ role: 'user', parts: [{ text: q }] }], 0.2, false, [{ google_search: {} }]);
-  const s = String(t || '').trim();
-  return (!s || s === 'ไม่พบ' || s.length < 25) ? '-' : s.slice(0, 1800);
-}
-
-function factsPending(limit) {
+// ---------- ข่าวย่อ (ตัวดึงข่าวเปิดอ่านเนื้อข่าว แล้วส่งมาให้ Gemini สรุปด้วยคำของมัน) ----------
+// ไม่เก็บเนื้อข่าวเต็ม เก็บเฉพาะข่าวย่อที่เรียบเรียงใหม่
+function needFacts(limit) {
   const sh = sheet_();
-  const lim = Math.min(Number(limit) || 4, 6);
+  const lim = Math.min(Number(limit) || 12, 20);
   const since = Date.now() - 2 * 24 * 3600 * 1000;
   const todo = rows_(sh).filter(function (o) {
     const d = dr_(o);
-    return o.title && !o.facts && Number(o.ts) >= since && d !== null && d >= 5;
+    return o.title && o.url && !o.facts && Number(o.ts) >= since && d !== null && d >= 5;
   });
   todo.sort(function (a, b) { return rank_(b) - rank_(a); });
-  let done = 0, failed = 0, err = '';
-  todo.slice(0, lim).forEach(function (o) {
-    try {
-      sh.getRange(o._row, 16).setValue(factsText_(o));
-      done++;
-    } catch (e) {
-      failed++;
-      err = String(e && e.message || e).slice(0, 120);
+  return todo.slice(0, lim).map(function (o) { return { id: o.id, url: o.url, title: o.title }; });
+}
+
+// text ว่าง = อ่านเนื้อข่าวไม่ได้ ใส่ "-" เพื่อไม่ต้องลองซ้ำ
+function factsFromText(id, text) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const sh = sheet_();
+    const o = rows_(sh).filter(function (x) { return x.id === id; })[0];
+    if (!o) return { ok: false };
+    const body = String(text || '').trim().slice(0, 7000);
+    let out = '-';
+    if (body.length >= 200) {
+      const q = 'หัวข้อข่าว: ' + (o.title_th || o.title) + '\nแหล่งข่าว: ' + (o.source || 'ไม่ระบุ') + '\n\nเนื้อข่าว:\n' + body;
+      const t = String(gemini_(FACTS_PROMPT, [{ role: 'user', parts: [{ text: q }] }], 0.2)).trim();
+      if (t.length >= 25) out = t.slice(0, 1800);
     }
-  });
-  const r = { done: done, failed: failed, left: Math.max(todo.length - done, 0) };
-  if (err) r.err = err;
-  return r;
+    sh.getRange(o._row, 16).setValue(out);
+    return { ok: true, has: out !== '-' };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function migrateLung_(sh) {
@@ -328,12 +332,6 @@ function retell(id) {
   const o = rows_(sh).filter(function (x) { return x.id === id; })[0];
   if (!o) throw new Error('ไม่พบข่าวนี้ (อาจถูกลบแล้ว)');
   if (o.lung) return o.lung;
-  if (!o.facts) {
-    try {
-      o.facts = factsText_(o);
-      sh.getRange(o._row, 16).setValue(o.facts);
-    } catch (e) { /* ไม่ได้ข่าวย่อ ก็เล่าจากหัวข้อต่อ */ }
-  }
   const t = retellText_(o);
   sh.getRange(o._row, 10).setValue(t);
   return t;

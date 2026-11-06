@@ -4,6 +4,7 @@
 ใช้แค่ stdlib · ห้ามพิมพ์เนื้อหาข่าวลง log (repo สาธารณะ) พิมพ์แค่จำนวน
 env: API_URL, API_KEY
 """
+import base64
 import hashlib
 import json
 import math
@@ -15,6 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from html.parser import HTMLParser
 
 UA = "Mozilla/5.0 (compatible; song-khao/1.0; +https://github.com/beethayu/song-khao)"
 HT = "{https://trends.google.com/trending/rss}"
@@ -156,6 +158,119 @@ def collect():
     return items
 
 
+BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+
+def fetch_html(url, timeout=15, limit=1_500_000):
+    req = urllib.request.Request(url, headers={
+        "User-Agent": BROWSER_UA, "Accept": "text/html,*/*", "Accept-Language": "th,en;q=0.8"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        raw = r.read(limit)
+        cs = r.headers.get_content_charset() or "utf-8"
+    return raw.decode(cs, errors="replace")
+
+
+def resolve_gnews(url):
+    """ลิงก์ Google News -> ลิงก์เว็บข่าวจริง (วิธีไม่เป็นทางการ พังได้ ต้องครอบ try)"""
+    m = re.search(r"/(?:rss/)?articles/([^?/#]+)", url)
+    if not m:
+        return url
+    gid = m.group(1)
+    try:  # รูปแบบเก่า: ลิงก์จริงฝังอยู่ใน base64
+        txt = base64.urlsafe_b64decode(gid + "=" * (-len(gid) % 4)).decode("latin1")
+        mm = re.search(r"https?://[\x21-\x7e]+", txt)
+        if mm and "AU_yqL" not in txt:
+            return mm.group(0)
+    except Exception:
+        pass
+    page = fetch_html(f"https://news.google.com/articles/{gid}", limit=600_000)
+    sg = re.search(r'data-n-a-sg="([^"]+)"', page)
+    ts = re.search(r'data-n-a-ts="([^"]+)"', page)
+    if not sg or not ts:
+        raise ValueError("no-signature")
+    inner = ('["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,null,null,0,1],'
+             f'"X","X",1,[1,1,1],1,1,null,0,0,null,0],"{gid}",{ts.group(1)},"{sg.group(1)}"]')
+    payload = "f.req=" + urllib.parse.quote(json.dumps([[["Fbv4je", inner]]]))
+    req = urllib.request.Request(
+        "https://news.google.com/_/DotsSplashUi/data/batchexecute", data=payload.encode("utf-8"),
+        headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", "User-Agent": BROWSER_UA})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        resp = r.read().decode("utf-8", errors="replace")
+    parsed = json.loads(resp.split("\n\n")[1])
+    return json.loads(parsed[0][2])[1]
+
+
+class _Paras(HTMLParser):
+    SKIP = {"script", "style", "noscript", "nav", "footer", "header", "aside", "form", "svg"}
+
+    def __init__(self):
+        super().__init__()
+        self.skip, self.inp, self.cur, self.paras, self.meta = 0, False, [], [], ""
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.SKIP:
+            self.skip += 1
+        elif tag == "p" and not self.skip:
+            self.inp, self.cur = True, []
+        elif tag == "meta" and not self.meta:
+            a = dict(attrs)
+            if a.get("property") == "og:description" or a.get("name") == "description":
+                self.meta = (a.get("content") or "").strip()
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIP:
+            self.skip = max(0, self.skip - 1)
+        elif tag == "p" and self.inp:
+            t = " ".join("".join(self.cur).split())
+            if len(t) >= 40:
+                self.paras.append(t)
+            self.inp = False
+
+    def handle_data(self, d):
+        if self.inp and not self.skip:
+            self.cur.append(d)
+
+
+def article_text(url):
+    """อ่านเนื้อข่าวไปสรุปเท่านั้น ไม่เก็บ ไม่แสดงเนื้อเต็ม"""
+    p = _Paras()
+    p.feed(fetch_html(url))
+    body = "\n".join(p.paras)
+    if p.meta:
+        body = p.meta + "\n" + body
+    return body[:7000]
+
+
+def facts_step():
+    try:
+        todo = call("needFacts", [12])
+    except Exception as e:
+        print("ขอรายการข่าวย่อล้มเหลว:", str(e)[:100])
+        return
+    got = ok = bad = g_try = g_ok = 0
+    for it in todo:
+        text, via_g = "", "news.google.com" in it["url"]
+        try:
+            url = resolve_gnews(it["url"]) if via_g else it["url"]
+            if via_g:
+                g_try += 1
+                time.sleep(1)
+            text = article_text(url)
+            if len(text) >= 200:
+                got += 1
+                g_ok += 1 if via_g else 0
+        except Exception as e:
+            bad += 1
+            print("อ่านเนื้อข่าวไม่ได้:", type(e).__name__, str(e)[:40])
+        try:
+            r = call("factsFromText", [it["id"], text])
+            ok += 1 if r.get("has") else 0
+        except Exception as e:
+            print("สรุปข่าวย่อล้มเหลว:", str(e)[:100])
+    print(f"ข่าวย่อ: ขอ {len(todo)} · อ่านเนื้อได้ {got} · สรุปสำเร็จ {ok} · อ่านไม่ได้ {bad} · ลิงก์ Google News {g_ok}/{g_try}")
+
+
 def call(fn, args):
     body = json.dumps({"fn": fn, "args": args, "k": os.environ["API_KEY"]}).encode("utf-8")
     req = urllib.request.Request(os.environ["API_URL"], data=body, method="POST",
@@ -202,15 +317,7 @@ def main():
         print(f"คะแนน รอบ {i + 1}:", r)
         if r.get("left", 0) == 0 or r.get("done", 0) == 0:
             break
-    for i in range(9):  # ค้นข่าวย่อ (Gemini + ค้นเว็บ) ทีละ 4 ข่าว สูงสุด 36 ข่าวต่อรอบ
-        try:
-            r = call("factsPending", [4])
-        except Exception as e:
-            print("ข่าวย่อล้มเหลว:", str(e)[:120])
-            break
-        print(f"ข่าวย่อ รอบ {i + 1}:", r)
-        if r.get("left", 0) == 0 or r.get("done", 0) == 0:
-            break
+    facts_step()
     for i in range(6):  # ให้ลุงเล่าทีละ 6 ข่าว สูงสุด 36 ข่าวต่อรอบ
         try:
             r = call("retellPending", [6])
