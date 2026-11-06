@@ -10,6 +10,8 @@ import math
 import os
 import re
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -158,8 +160,16 @@ def call(fn, args):
     body = json.dumps({"fn": fn, "args": args, "k": os.environ["API_KEY"]}).encode("utf-8")
     req = urllib.request.Request(os.environ["API_URL"], data=body, method="POST",
                                  headers={"Content-Type": "text/plain;charset=utf-8", "User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=300) as r:
-        res = json.loads(r.read().decode("utf-8"))
+    for attempt in range(3):  # Apps Script ตอบ 502/ช้าเป็นบางครั้ง ลองใหม่ได้ (ทุกคำสั่งส่งซ้ำได้ไม่เบิ้ล)
+        try:
+            with urllib.request.urlopen(req, timeout=300) as r:
+                res = json.loads(r.read().decode("utf-8"))
+            break
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            if attempt == 2:
+                raise
+            print(f"{fn}: เรียกไม่ติด ({type(e).__name__}) ลองใหม่")
+            time.sleep(8 * (attempt + 1))
     if not res.get("ok"):
         raise RuntimeError(res.get("error", "api error"))
     return res["result"]
@@ -202,7 +212,11 @@ def main():
         if r.get("left", 0) == 0 or r.get("done", 0) == 0:
             break
     for i in range(6):  # ให้ลุงเล่าทีละ 6 ข่าว สูงสุด 36 ข่าวต่อรอบ
-        r = call("retellPending", [6])
+        try:
+            r = call("retellPending", [6])
+        except Exception as e:
+            print("ลุงเล่าล้มเหลว:", str(e)[:120])
+            break
         print(f"retell รอบ {i + 1}:", r)
         if r.get("left", 0) == 0 or r.get("done", 0) == 0:
             break

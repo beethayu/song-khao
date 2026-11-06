@@ -398,6 +398,7 @@ function gemini_(system, contents, temp, asJson, tools) {
   };
   if (asJson) payload.generationConfig.responseMimeType = 'application/json';
   if (tools) payload.tools = tools;
+  let last = '';
   for (let m = 0; m < MODELS.length; m++) {
     for (let t = 0; t < 2; t++) {
       const res = UrlFetchApp.fetch(
@@ -407,6 +408,11 @@ function gemini_(system, contents, temp, asJson, tools) {
           headers: { 'x-goog-api-key': key }, payload: JSON.stringify(payload)
         });
       const code = res.getResponseCode();
+      if (code !== 200) {
+        let em = '';
+        try { em = String(JSON.parse(res.getContentText()).error.message || '').slice(0, 90); } catch (e) { /* ignore */ }
+        last = code + (em ? ' ' + em : '');
+      }
       if (code === 200) {
         const j = JSON.parse(res.getContentText());
         const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
@@ -421,5 +427,5 @@ function gemini_(system, contents, temp, asJson, tools) {
       Utilities.sleep(1500 + Math.floor(Math.random() * 1000));
     }
   }
-  throw new Error('Gemini ไม่ว่าง (คนใช้เยอะ) รอสักครู่แล้วกดส่งใหม่');
+  throw new Error('Gemini ไม่ว่าง' + (last ? ' [' + last + ']' : '') + ' รอสักครู่แล้วกดส่งใหม่');
 }
