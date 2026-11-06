@@ -103,6 +103,26 @@ def gnews(query, region, hl, gl, ceid, label):
     return out
 
 
+def rss(url, region, label, limit=25):
+    """RSS ของสำนักข่าวโดยตรง (ลิงก์จริง อ่านเนื้อข่าวไปสรุปได้)"""
+    root = ET.fromstring(get(url))
+    out = []
+    for i, it in enumerate(root.iter("item")):
+        title = re.sub(r"\s+", " ", (it.findtext("title") or "")).strip()
+        link = (it.findtext("link") or "").strip()
+        desc = re.sub(r"<[^>]+>", " ", it.findtext("description") or "")
+        desc = re.sub(r"\s+", " ", desc).strip()[:300]
+        if not title or not link:
+            continue
+        out.append(dict(
+            id=mid(region, title), region=region, title=title, source=label, url=link,
+            raw=max(50 - i, 1), metric=f"ข่าวเด่น · {label}", snippet=desc, tag=label,
+        ))
+        if len(out) >= limit:
+            break
+    return out
+
+
 def reddit(sub, region):
     data = json.loads(get(f"https://www.reddit.com/r/{sub}/top.json?t=day&limit=25"))
     out = []
@@ -131,6 +151,25 @@ SOURCES = [
     ("reddit-worldnews", lambda: reddit("worldnews", "world")),
     ("reddit-news", lambda: reddit("news", "world")),
 ]
+
+
+RSS_TH = [
+    ("thairath", "https://www.thairath.co.th/rss/news", "ไทยรัฐ"),
+    ("khaosod", "https://www.khaosod.co.th/feed", "ข่าวสด"),
+    ("matichon", "https://www.matichon.co.th/feed", "มติชน"),
+    ("dailynews", "https://www.dailynews.co.th/feed/", "เดลินิวส์"),
+    ("mthai", "https://news.mthai.com/feed", "MThai"),
+    ("sanook", "https://www.sanook.com/news/rss/", "Sanook"),
+]
+RSS_WORLD = [
+    ("bbc", "https://feeds.bbci.co.uk/news/world/rss.xml", "BBC News"),
+    ("guardian", "https://www.theguardian.com/world/rss", "The Guardian"),
+    ("aljazeera", "https://www.aljazeera.com/xml/rss/all.xml", "Al Jazeera"),
+    ("npr", "https://feeds.npr.org/1004/rss.xml", "NPR"),
+    ("dw", "https://rss.dw.com/rdf/rss-en-all", "DW"),
+]
+SOURCES += [("rss-" + n, (lambda u=u, l=l: rss(u, "th", l))) for n, u, l in RSS_TH]
+SOURCES += [("rss-" + n, (lambda u=u, l=l: rss(u, "world", l))) for n, u, l in RSS_WORLD]
 
 
 def collect():
@@ -252,10 +291,10 @@ def facts_step():
     for it in todo:
         text, via_g = "", "news.google.com" in it["url"]
         try:
-            url = resolve_gnews(it["url"]) if via_g else it["url"]
             if via_g:
                 g_try += 1
                 time.sleep(1)
+            url = resolve_gnews(it["url"]) if via_g else it["url"]
             text = article_text(url)
             if len(text) >= 200:
                 got += 1
