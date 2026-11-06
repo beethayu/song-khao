@@ -5,7 +5,7 @@
  */
 
 const SHEET_NAME = 'news';
-const HEAD = ['id', 'region', 'title', 'source', 'url', 'metric', 'score', 'ts', 'snippet', 'lung', 'tag', 'title_th'];
+const HEAD = ['id', 'region', 'title', 'source', 'url', 'metric', 'score', 'ts', 'snippet', 'lung', 'tag', 'title_th', 'drama', 'sides', 'mood'];
 const KEEP_DAYS = 4;
 const MAX_ROWS = 600;
 const MODELS = ['gemini-3.5-flash', 'gemini-3.5-flash-lite'];
@@ -17,8 +17,26 @@ const LUNG = [
   '2) เรื่องของคนจริง/คดี/อุบัติเหตุ ให้ใช้ "ตามข่าวว่า…" ห้ามตัดสิน กล่าวหา หรือซ้ำเติมใคร',
   '3) ถ้าข้อมูลมีแค่หัวข้อสั้น ๆ ให้เล่าสั้น แล้วบอกตรง ๆ ว่า "ลุงรู้แค่นี้ รายละเอียดตามไปอ่านต้นฉบับนะ"',
   '4) ข่าวเศร้า/เสียชีวิต/เหตุรุนแรง ให้เล่าสุภาพ ไม่เล่นมุก',
-  '5) ตอบเป็นข้อความธรรมดา ไม่ใช้สัญลักษณ์ markdown'
+  '5) ตอบเป็นข้อความธรรมดา ไม่ใช้สัญลักษณ์ markdown',
+  '6) เวลาจิกกัด จิกได้เฉพาะ "สถานการณ์/พฤติกรรม/ระบบ" ห้ามด่าตัวบุคคล ห้ามคำหยาบ ห้ามล้อรูปร่าง เพศ ศาสนา เชื้อชาติ ความพิการ',
+  '7) ห้ามแตะหรือเล่นมุกเกี่ยวกับสถาบันพระมหากษัตริย์',
+  '8) เรื่องของคนจริง ห้ามฟันธงว่าใครผิด ให้คนอ่านตัดสินเอง'
 ].join('\n');
+
+const SCORE_PROMPT = [
+  'คุณเป็นบรรณาธิการคอนเทนต์ดราม่าของเพจเล่าข่าวสไตล์ลุงจิกกัดขำ ๆ ให้คะแนนหัวข้อข่าวแต่ละข้อ',
+  'd = คะแนน 0-10 ว่าเป็น "ดราม่าที่คนทั่วไปเข้าใจง่าย มีคู่กรณีหรือประเด็นให้เลือกข้างและคอมเมนต์เถียงกันได้"',
+  '  สูง 7-10: พฤติกรรมคน ความไม่ยุติธรรม ร้านค้า/ผู้บริโภค ค่าครองชีพ ดราม่าโซเชียล ความเห็นขัดแย้งที่ชาวบ้านมีส่วนร่วม',
+  '  กลาง 4-6: มีประเด็นแต่เถียงยาก',
+  '  ต่ำ 0-2: ตัวเลขล้วน (เลขสลาก/ผลรางวัล) ราคาทอง/หุ้น/น้ำมัน สภาพอากาศ ผลกีฬา/บันเทิง ประกาศทางการ ข่าวเทคนิค/ธุรกิจเฉพาะทาง ข่าวที่ไม่มีคู่กรณีหรือประเด็นให้เถียง',
+  '  เรื่องสถาบันพระมหากษัตริย์ ให้ d = 0',
+  'sides = สองฝั่งที่คนน่าจะเถียงกัน ไม่เกิน 12 คำ รูปแบบ "ฝั่ง A / ฝั่ง B" (ถ้าไม่มีให้เป็นสตริงว่าง)',
+  'mood = "jig" (จิกกัดขำ ๆ ได้) | "neutral" (การเมืองพรรค ศาสนา ประเด็นแบ่งขั้ว: เล่าเป็นกลาง) | "serious" (เสียชีวิต เหตุรุนแรง เด็ก เหยื่อ อุบัติเหตุ ภัยพิบัติ: เล่าสุภาพ ห้ามเล่นมุก)',
+  'ตอบเป็น JSON array ของ object {"d":number,"sides":string,"mood":string} จำนวนและลำดับตรงกับหัวข้อที่ให้'
+].join('\n');
+
+function dr_(o) { return (o.drama === '' || o.drama == null) ? null : Number(o.drama); }
+function rank_(o) { const d = dr_(o); return (d === null ? 4 : d) * 12 + (Number(o.score) || 0); }
 
 // ---------- API ----------
 function doPost(e) {
@@ -50,6 +68,7 @@ const API = {
   ingest: ingest,
   retellPending: retellPending,
   translatePending: translatePending,
+  scorePending: scorePending,
   retell: retell,
   chat: chat
 };
@@ -102,7 +121,8 @@ function pub_(o) {
   return {
     id: o.id, region: o.region, title: o.title, source: o.source, url: o.url,
     metric: o.metric, score: Number(o.score) || 0, ts: Number(o.ts) || 0,
-    lung: o.lung || '', tag: o.tag || '', title_th: o.title_th || ''
+    lung: o.lung || '', tag: o.tag || '', title_th: o.title_th || '',
+    drama: dr_(o), sides: o.sides || '', mood: o.mood || ''
   };
 }
 
@@ -112,9 +132,10 @@ function list(region, limit) {
   const lim = Math.min(Number(limit) || 40, 80);
   const since = Date.now() - 2 * 24 * 3600 * 1000;
   const all = rows_(sh).filter(function (o) {
-    return (!region || o.region === region) && Number(o.ts) >= since && o.title;
+    const d = dr_(o);
+    return (!region || o.region === region) && Number(o.ts) >= since && o.title && (d === null || d >= 3);
   });
-  all.sort(function (a, b) { return Number(b.score) - Number(a.score); });
+  all.sort(function (a, b) { return rank_(b) - rank_(a); });
   return all.slice(0, lim).map(pub_);
 }
 
@@ -140,7 +161,7 @@ function ingest(items) {
         upd++;
       } else {
         add.push([it.id, it.region, it.title, it.source || '', it.url || '', it.metric || '',
-          Number(it.score) || 0, now, String(it.snippet || '').slice(0, 600), '', it.tag || '', '']);
+          Number(it.score) || 0, now, String(it.snippet || '').slice(0, 600), '', it.tag || '', '', '', '', '']);
         byId[it.id] = { _row: -1 };
       }
     });
@@ -191,15 +212,43 @@ function translatePending(limit) {
   return { done: done, left: Math.max(todo.length - done, 0) };
 }
 
+// ---------- ให้คะแนนความดราม่า + หาสองฝั่งที่คนจะเถียง ----------
+function scorePending(limit) {
+  const sh = sheet_();
+  const lim = Math.min(Number(limit) || 25, 30);
+  const since = Date.now() - 2 * 24 * 3600 * 1000;
+  const todo = rows_(sh).filter(function (o) {
+    return o.title && dr_(o) === null && Number(o.ts) >= since;
+  });
+  todo.sort(function (a, b) { return Number(b.score) - Number(a.score); });
+  const batch = todo.slice(0, lim);
+  if (!batch.length) return { done: 0, left: 0 };
+  const prompt = JSON.stringify(batch.map(function (o) { return o.title_th || o.title; }));
+  const arr = JSON.parse(gemini_(SCORE_PROMPT, [{ role: 'user', parts: [{ text: prompt }] }], 0.2, true));
+  if (!Array.isArray(arr) || arr.length !== batch.length) throw new Error('ให้คะแนนไม่ครบ ลองใหม่');
+  let done = 0;
+  batch.forEach(function (o, i) {
+    const r = arr[i] || {};
+    const d = Math.max(0, Math.min(10, Math.round(Number(r.d))));
+    if (isNaN(d)) return;
+    const mood = ['jig', 'neutral', 'serious'].indexOf(r.mood) >= 0 ? r.mood : 'neutral';
+    sh.getRange(o._row, 13, 1, 3).setValues([[d, String(r.sides || '').slice(0, 80), mood]]);
+    if (o.lung) sh.getRange(o._row, 10).setValue(''); // ล้างสำนวนเก่า ให้ลุงเล่าใหม่ตามสไตล์ใหม่
+    done++;
+  });
+  return { done: done, left: Math.max(todo.length - done, 0) };
+}
+
 // ---------- ลุงเล่า ----------
 function retellPending(limit) {
   const sh = sheet_();
   const lim = Math.min(Number(limit) || 6, 10);
   const since = Date.now() - 2 * 24 * 3600 * 1000;
   const todo = rows_(sh).filter(function (o) {
-    return !o.lung && o.title && Number(o.ts) >= since;
+    const d = dr_(o);
+    return !o.lung && o.title && Number(o.ts) >= since && (d === null || d >= 5);
   });
-  todo.sort(function (a, b) { return Number(b.score) - Number(a.score); });
+  todo.sort(function (a, b) { return rank_(b) - rank_(a); });
   let done = 0, failed = 0;
   todo.slice(0, lim).forEach(function (o) {
     try {
@@ -223,14 +272,25 @@ function retell(id) {
 }
 
 function newsInfo_(o) {
-  return 'หัวข้อ: ' + o.title +
+  return 'หัวข้อ: ' + o.title + (o.title_th ? '\nแปลไทย: ' + o.title_th : '') +
     (o.snippet ? '\nสรุป/ข้อมูลเพิ่ม: ' + o.snippet : '') +
     '\nแหล่ง: ' + (o.source || 'ไม่ระบุ') +
     (o.metric ? '\nความร้อนแรง: ' + o.metric : '');
 }
 
 function retellText_(o) {
-  const prompt = 'เล่าข่าวนี้ใหม่ในสำนวนลุง ความยาว 3–5 ประโยค ปิดท้ายด้วยประโยคเดียวที่ชวนให้คนอ่านอยากแสดงความเห็น\n\n' + newsInfo_(o);
+  const mood = o.mood || 'jig';
+  let how;
+  if (mood === 'serious') {
+    how = 'ข่าวนี้อ่อนไหว เล่าสุภาพ เห็นใจ ห้ามเล่นมุกหรือจิกกัด 3–4 ประโยค ปิดท้ายด้วยประโยคห่วงใยหรือเตือนใจ ไม่ต้องถามให้เลือกข้าง';
+  } else if (mood === 'neutral') {
+    how = 'ข่าวนี้อ่อนไหว (การเมือง/ศาสนา/ประเด็นแบ่งขั้ว) เล่าเป็นกลาง ไม่เข้าข้างและไม่จิกฝ่ายใดเป็นพิเศษ 3–4 ประโยค ปิดท้ายถามความเห็นแบบเปิด ไม่ชี้นำ';
+  } else {
+    how = 'เล่าแบบจิก ๆ ขำ ๆ 4–6 ประโยค: เปิดด้วยประโยคสะดุดหู เล่าข้อเท็จจริงสั้น ๆ แล้วจิกกัดที่ตัวสถานการณ์/พฤติกรรม/ระบบ ' +
+      'ปิดท้ายด้วยคำถามให้คนเลือกข้างในคอมเมนต์ 1 ประโยค เช่น "หลานอยู่ทีมไหน…?"' +
+      (o.sides ? '\nฝั่งที่คนน่าจะเถียงกัน: ' + o.sides : '');
+  }
+  const prompt = 'เล่าข่าวนี้ใหม่ในสำนวนลุง ' + how + '\n\n' + newsInfo_(o);
   return gemini_(LUNG, [{ role: 'user', parts: [{ text: prompt }] }], 0.8);
 }
 

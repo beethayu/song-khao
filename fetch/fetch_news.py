@@ -19,7 +19,7 @@ HT = "{https://trends.google.com/trending/rss}"
 
 # คำที่ตัดทิ้ง (บันเทิง/กีฬา) แบบหยาบ ๆ
 SKIP = re.compile(
-    r"ฟุตบอล|พรีเมียร์ลีก|ลีกสูงสุด|บอลโลก|ผลบอล|นักเตะ|แมนยู|ลิเวอร์พูล|เรอัล|บาร์เซโลนา|"
+    r"หวย|เลขเด็ด|ตรวจสลาก|ผลสลาก|สลากกินแบ่ง|ฟุตบอล|พรีเมียร์ลีก|ลีกสูงสุด|บอลโลก|ผลบอล|นักเตะ|แมนยู|ลิเวอร์พูล|เรอัล|บาร์เซโลนา|"
     r"ละคร|ซีรีส์|ซีรีย์|นักแสดง|ดารา|คอนเสิร์ต|เพลงใหม่|อัลบั้ม|ศิลปิน|หนังใหม่|ภาพยนตร์|เรตติ้ง|เกมโชว์|"
     r"มวยไทย|ไฮไลท์|ชิงแชมป์|โอลิมปิก|"
     r"\b(nba|nfl|mlb|nhl|ufc|wwe|premier league|champions league|box office|album|concert|"
@@ -133,7 +133,8 @@ def collect():
     items, seen = [], set()
     for name, fn in SOURCES:
         try:
-            got = [x for x in fn() if x["title"] and not SKIP.search(x["title"] + " " + x["tag"])]
+            got = [x for x in fn() if x["title"] and re.search(r"[A-Za-zก-๙]", x["title"])
+                   and not SKIP.search(x["title"] + " " + x["tag"])]
         except Exception as e:  # ข้ามแหล่งที่พัง ไม่ล้มทั้งงาน
             print(f"{name}: ล้มเหลว ({type(e).__name__})")
             continue
@@ -182,7 +183,16 @@ def main():
         print(f"แปล รอบ {i + 1}:", r)
         if r.get("left", 0) == 0 or r.get("done", 0) == 0:
             break
-    for i in range(4):  # ให้ลุงเล่าทีละ 6 ข่าว สูงสุด 24 ข่าวต่อรอบ
+    for i in range(4):  # ให้คะแนนความดราม่าทีละ 25 หัวข้อ (พลาดไม่ล้มทั้งงาน)
+        try:
+            r = call("scorePending", [25])
+        except Exception as e:
+            print("ให้คะแนนล้มเหลว:", str(e)[:80])
+            break
+        print(f"คะแนน รอบ {i + 1}:", r)
+        if r.get("left", 0) == 0 or r.get("done", 0) == 0:
+            break
+    for i in range(6):  # ให้ลุงเล่าทีละ 6 ข่าว สูงสุด 36 ข่าวต่อรอบ
         r = call("retellPending", [6])
         print(f"retell รอบ {i + 1}:", r)
         if r.get("left", 0) == 0 or r.get("done", 0) == 0:

@@ -46,6 +46,7 @@ nav button.on svg{stroke:var(--acc)}
 .lab{font-size:12px;color:var(--mut);font-weight:500}
 .ttl{font-size:17px;font-weight:700;line-height:1.4;margin:1px 0 3px;color:var(--ink)}
 .sub{font-size:12px;color:var(--mut)}
+.sd{font-size:13px;color:var(--warn);font-weight:600;margin-bottom:3px}
 .orig{font-size:12px;color:var(--mut);margin-bottom:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .nb{padding:0 14px 14px 52px}
 .lung{color:var(--ink);white-space:pre-line;font-size:15px;line-height:1.65;padding-top:10px;border-top:1px solid var(--line)}
@@ -201,7 +202,7 @@ function itemHtml(it,i,hot){
     b+='<button class="btn'+(isSaved(it.id)?' on':'')+'" data-act="save" data-id="'+esc(it.id)+'">'+(isSaved(it.id)?'เก็บแล้ว ✓':'เก็บไว้')+'</button></div>';
     b='<div class="nb">'+b+'</div>';
   }
-  return '<div class="n"><button class="nh" data-act="tog" data-id="'+esc(it.id)+'"><span class="rk'+(hot?' hot':'')+'">'+(i+1)+'</span><span class="nt"><div class="lab">'+esc(it.metric||it.tag||'')+'</div><div class="ttl">'+esc(it.title_th||it.title)+'</div>'+(it.title_th?'<div class="orig">'+esc(it.title)+'</div>':'')+'<div class="sub">'+esc(it.source||'')+(it.ts?' · อัปเดต '+ago(it.ts):'')+'</div></span></button>'+b+'</div>';
+  return '<div class="n"><button class="nh" data-act="tog" data-id="'+esc(it.id)+'"><span class="rk'+(hot?' hot':'')+'">'+(i+1)+'</span><span class="nt"><div class="lab">'+esc(it.metric||it.tag||'')+(it.drama!=null?' · ดราม่า '+it.drama+'/10':'')+'</div><div class="ttl">'+esc(it.title_th||it.title)+'</div>'+(it.title_th?'<div class="orig">'+esc(it.title)+'</div>':'')+(it.sides?'<div class="sd">เลือกข้าง: '+esc(it.sides)+'</div>':'')+'<div class="sub">'+esc(it.source||'')+(it.ts?' · อัปเดต '+ago(it.ts):'')+'</div></span></button>'+b+'</div>';
 }
 function listHtml(list,mode){
   var c=cfg();
