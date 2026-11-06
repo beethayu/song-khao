@@ -62,6 +62,7 @@ nav button.on svg{stroke:var(--acc)}
 .btn.acc{background:var(--acc);color:#fff}
 .btn.on{background:#fff1e6;color:var(--acc)}
 .btn:disabled{opacity:.5}
+.pimg{width:100%;border-radius:12px;margin-top:10px;display:block}
 .card{background:var(--card);border-radius:14px;margin-bottom:12px;overflow:hidden}
 .pad{padding:14px}
 .row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line)}
@@ -127,7 +128,7 @@ var S={
   news:LS.get('sk_news',{th:[],world:[],at:0}),
   saved:LS.get('sk_saved',[]),
   chat:LS.get('sk_chat',[]),
-  ctx:null,tst:{t:'',c:''},busy:0,open:{},retelling:{},loading:false,sending:false,chatErr:'',wipeArm:false
+  ctx:null,tst:{t:'',c:''},busy:0,open:{},retelling:{},posting:{},post:LS.get('sk_post',{}),loading:false,sending:false,chatErr:'',wipeArm:false
 };
 if(!TABS[S.tab]||S.tab==='chat')S.tab='th';
 
@@ -197,8 +198,12 @@ function itemHtml(it,i,hot){
     else if(it.lung)b+=fx+'<div class="lh">ลุงเล่า</div><div class="lung">'+esc(it.lung)+'</div>';
     else b+=fx+'<div class="note">ลุงยังไม่ได้เล่าข่าวนี้</div>';
     var link=/^https?:\/\//.test(it.url||'')?' · <a href="'+esc(it.url)+'" target="_blank" rel="noopener">อ่านต้นฉบับ</a>':'';
+    if(S.posting[it.id])b+='<div class="load">ลุงกำลังเรียบเรียงโพสต์…</div>';
+    else if(S.post[it.id]){var p=S.post[it.id];b+='<div class="lh">โพสต์ที่ลุงร่างให้</div><div class="lung">'+esc(postText(p))+'</div><img class="pimg" src="'+postImg(p)+'" alt="การ์ดภาพ"><div class="note">กดค้างที่ภาพเพื่อบันทึก</div>'}
     b+='<div class="note">ที่มา: '+esc(it.source||'-')+link+'</div><div class="acts">';
     if(!it.lung&&!S.retelling[it.id])b+='<button class="btn acc" data-act="retell" data-id="'+esc(it.id)+'">ให้ลุงเล่า</button>';
+    if(!S.posting[it.id])b+='<button class="btn acc" data-act="post" data-id="'+esc(it.id)+'">'+(S.post[it.id]?'ทำโพสต์ใหม่':'สร้างโพสต์')+'</button>';
+    if(S.post[it.id])b+='<button class="btn" data-act="cpost" data-id="'+esc(it.id)+'">คัดลอกโพสต์</button>';
     b+='<button class="btn pri" data-act="ask" data-id="'+esc(it.id)+'">ถามลุง</button>';
     b+='<button class="btn" data-act="copy" data-id="'+esc(it.id)+'">คัดลอก</button>';
     b+='<button class="btn'+(isSaved(it.id)?' on':'')+'" data-act="save" data-id="'+esc(it.id)+'">'+(isSaved(it.id)?'เก็บแล้ว ✓':'เก็บไว้')+'</button></div>';
@@ -265,6 +270,33 @@ function clip(t){
     document.body.removeChild(ta);
   });
 }
+function postText(p){return p.hook+'\n\n'+p.body+'\n\n'+p.q+'\n\n'+p.tags.join(' ')}
+var IMGC={};
+function postImg(p){
+  if(IMGC[p.hook])return IMGC[p.hook];
+  var W=1080,c=document.createElement('canvas');c.width=W;c.height=W;var x=c.getContext('2d');
+  var g=x.createLinearGradient(0,0,W,W);g.addColorStop(0,'#1d2b4a');g.addColorStop(1,'#0a0f1f');x.fillStyle=g;x.fillRect(0,0,W,W);
+  x.fillStyle='#ff8a3d';x.fillRect(90,150,120,10);
+  x.fillStyle='#fff';x.textBaseline='top';
+  var fs=82,font=function(s){x.font='700 '+s+'px -apple-system,"Thonburi","Sarabun",sans-serif'};
+  var segs=(window.Intl&&Intl.Segmenter)?Array.from(new Intl.Segmenter('th',{granularity:'word'}).segment(p.hook),function(s){return s.segment}):p.hook.split('');
+  var lines;
+  for(;;){
+    font(fs);lines=[];var cur='';
+    segs.forEach(function(s){var t=cur+s;if(x.measureText(t).width>W-180&&cur){lines.push(cur.trim());cur=s}else cur=t});
+    if(cur.trim())lines.push(cur.trim());
+    if(lines.length<=6||fs<48)break;fs-=6;
+  }
+  lines.forEach(function(l,i){x.fillText(l,90,210+i*fs*1.35)});
+  x.fillStyle='#9fb0d0';font(34);x.fillText('ส่งข่าว · ลุงเล่า',90,W-130);
+  return IMGC[p.hook]=c.toDataURL('image/png');
+}
+async function doPost(id){
+  if(S.posting[id])return;
+  S.posting[id]=1;render(true);
+  try{S.post[id]=await api('makePost',[id],120000);var k=Object.keys(S.post);if(k.length>40)delete S.post[k[0]];LS.set('sk_post',S.post)}catch(e){toast(e.message)}
+  delete S.posting[id];render(true);
+}
 async function doRetell(id){
   if(S.retelling[id])return;
   S.retelling[id]=1;render(true);
@@ -294,6 +326,8 @@ function go(tab){S.tab=tab;if(tab!=='chat')LS.set('sk_tab',tab);render()}
 var ACT={
   tog:function(id){S.open[id]=!S.open[id];render(true)},
   retell:function(id){doRetell(id)},
+  post:function(id){doPost(id)},
+  cpost:function(id,btn){var p=S.post[id];if(!p)return;clip(postText(p)).then(function(){btn.textContent='คัดลอกแล้ว ✓';setTimeout(function(){btn.textContent='คัดลอกโพสต์'},1500)},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่ข้อความ')})},
   ask:function(id){var it=find(id);if(!it)return;S.ctx={id:id,title:it.title_th||it.title};S.chatErr='';go('chat')},
   copy:function(id,btn){
     var it=find(id);if(!it)return;

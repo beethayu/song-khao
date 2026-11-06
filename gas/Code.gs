@@ -86,6 +86,7 @@ const API = {
   needFacts: needFacts,
   factsFromText: factsFromText,
   retell: retell,
+  makePost: makePost,
   chat: chat
 };
 
@@ -359,6 +360,25 @@ function retellText_(o) {
   }
   const prompt = 'เล่าข่าวนี้ใหม่ในสำนวนลุง ' + how + '\n\n' + newsInfo_(o);
   return gemini_(LUNG, [{ role: 'user', parts: [{ text: prompt }] }], 0.8);
+}
+
+// ---------- สร้างโพสต์ ----------
+function makePost(id) {
+  const o = rows_(sheet_()).filter(function (x) { return x.id === id; })[0];
+  if (!o) throw new Error('ไม่พบข่าวนี้ (อาจถูกลบแล้ว)');
+  const mood = o.mood || 'jig';
+  const tone = mood === 'serious' ? 'ข่าวอ่อนไหว: น้ำเสียงสุภาพเห็นใจ ห้ามมุกหรือจิกกัด ไม่ต้องมีคำถามเลือกข้าง (q ให้เป็นประโยคชวนแสดงความรู้สึก/ห่วงใย)'
+    : mood === 'neutral' ? 'ข่าวอ่อนไหว: เป็นกลาง ไม่เข้าข้าง q ให้เป็นคำถามเปิดไม่ชี้นำ'
+    : 'จิก ๆ ขำ ๆ แบบลุง จิกที่สถานการณ์/ระบบ/พฤติกรรม ไม่จิกตัวบุคคล q ให้เป็นคำถามให้คนเลือกข้างในคอมเมนต์' + (o.sides ? ' (ฝั่ง: ' + o.sides + ')' : '');
+  const prompt = 'ทำโพสต์ Facebook/X จากข่าวนี้ ตอบเป็น JSON เท่านั้น รูปแบบ {"hook":"","body":"","q":"","tags":["","","","",""]}\n' +
+    '- hook: ประโยคเปิดสะดุดหู ไม่เกิน 60 ตัวอักษร (ใช้บนการ์ดภาพด้วย)\n' +
+    '- body: เนื้อสั้นแบบลุง 2–3 ประโยค ยึดข้อเท็จจริงในข้อมูลเท่านั้น ห้ามแต่ง ข่าวคดีใช้ "ผู้ต้องหา/ถูกกล่าวหาว่า"\n' +
+    '- q: คำถามปิดท้าย 1 ประโยค\n- tags: แฮชแท็กไทย 5 อัน ขึ้นต้นด้วย # ไม่มีเว้นวรรค\n' + tone + '\n\n' + newsInfo_(o) + (o.lung ? '\nที่ลุงเล่าไว้แล้ว: ' + o.lung : '');
+  const raw = gemini_(LUNG, [{ role: 'user', parts: [{ text: prompt }] }], 0.8, true);
+  let j;
+  try { j = JSON.parse(raw); } catch (e) { throw new Error('ลุงเรียบเรียงไม่สำเร็จ ลองกดใหม่'); }
+  const tags = (j.tags || []).map(function (t) { t = String(t).replace(/\s+/g, ''); return t.charAt(0) === '#' ? t : '#' + t; }).slice(0, 5);
+  return { hook: String(j.hook || '').slice(0, 90), body: String(j.body || ''), q: String(j.q || ''), tags: tags };
 }
 
 // ---------- แชท ----------
