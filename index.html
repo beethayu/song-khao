@@ -114,7 +114,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='1 · 2026-11-06';
+var VERSION='2 · 2026-11-06';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -218,6 +218,22 @@ function listHtml(list,mode){
     if(mode==='saved')return '<div class="card empty"><div class="h2">ยังไม่มีข่าวที่เก็บไว้</div><div class="hint">กดเปิดข่าว แล้วกด "เก็บไว้" เพื่อเก็บเป็นวัตถุดิบทำคอนเทนต์</div></div>';
     return '<div class="card empty"><div class="h2">ยังไม่มีข่าว</div><div class="hint">ตัวดึงข่าวทำงานทุก 2 ชั่วโมง กดปุ่มรีเฟรชด้านบนเพื่อโหลดใหม่</div></div>';
   }
+  
+  if(mode==='saved'){
+    return list.map(function(it,i){
+      var html = '<div class="n" style="padding-bottom:10px">' + itemHtml(it,i,false);
+      var statusOpts = ['todo','doing','done'].map(function(s){
+         var lbl = s==='todo'?'⏳ ยังไม่ทำ':(s==='doing'?'✍️ กำลังทำ':'✅ โพสต์แล้ว');
+         return '<option value="'+s+'" '+(it.status===s?'selected':'')+'>'+lbl+'</option>';
+      }).join('');
+      html += '<div style="padding: 0 14px 14px 14px; border-top: 1px dashed var(--line); margin-top:10px">';
+      html += '<select data-act="status" data-id="'+esc(it.id)+'" style="font-size:16px; padding:4px; border-radius:6px; border:1px solid #ccc; margin-bottom:6px; width:100%">'+statusOpts+'</select>';
+      html += '<input type="text" data-act="note" data-id="'+esc(it.id)+'" value="'+esc(it.note||'')+'" placeholder="เพิ่มโน้ต (เช่น ทำคลิปตอนเย็น)..." style="font-size:16px; padding:8px; width:100%; border:1px solid #ccc; border-radius:6px;">';
+      html += '</div></div>';
+      return html;
+    }).join('');
+  }
+  
   return list.map(function(it,i){return itemHtml(it,i,mode!=='saved'&&i<3)}).join('');
 }
 function chatHtml(){
@@ -239,6 +255,7 @@ function setHtml(){
   return '<div class="card"><div class="row"><label>API URL</label><input id="cu" value="'+esc(c.url)+'" placeholder="https://script.google.com/…" autocapitalize="off" autocorrect="off" spellcheck="false"></div><div class="row"><label>API KEY</label><input id="ck" type="password" value="'+esc(c.key)+'" placeholder="รหัสที่ตั้งไว้" autocapitalize="off" autocorrect="off"></div></div>'+
   '<div class="acts" style="margin:0 0 6px"><button class="btn pri" data-act="test">ทดสอบการเชื่อมต่อ</button></div><div class="note" id="tst" style="margin:0 4px 16px;color:'+(S.tst.c||'var(--mut)')+'">'+esc(S.tst.t)+'</div>'+
   '<div class="card pad"><div class="h2">ลุงใช้ Gemini</div><div class="hint">ข่าวที่ลุงเล่าแล้วเก็บไว้ในชีตและในเครื่อง เปิดอ่านได้แม้ไม่ได้ใช้ Claude ส่วนแชทต้องใช้ Gemini ผ่านหลังบ้าน</div></div>'+
+  '<div class="card pad"><div class="h2">เครื่องมือ</div><div class="acts"><button class="btn" data-act="size">เช็คพื้นที่เครื่อง</button><button class="btn" data-act="hist">ดูประวัติโพสต์ ('+Object.keys(S.post).length+')</button></div><div class="note" id="sizeOut" style="margin-top:10px;color:var(--mut)"></div></div>'+
   '<div class="card pad"><div class="h2">ข้อมูลในเครื่อง</div><div class="hint" style="margin-bottom:10px">ข่าวที่เก็บไว้ '+S.saved.length+' · ข้อความแชท '+S.chat.length+'</div><button class="btn" data-act="wipe">'+(S.wipeArm?'แตะอีกครั้งเพื่อยืนยันล้าง':'ล้างข้อมูลในเครื่อง')+'</button></div>'+
   '<div class="note" style="text-align:center">ส่งข่าว · เวอร์ชัน '+VERSION+'</div>';
 }
@@ -294,7 +311,25 @@ function postImg(p){
 async function doPost(id){
   if(S.posting[id])return;
   S.posting[id]=1;render(true);
-  try{S.post[id]=await api('makePost',[id],120000);var k=Object.keys(S.post);if(k.length>40)delete S.post[k[0]];LS.set('sk_post',S.post)}catch(e){toast(e.message)}
+  try{
+    S.post[id]=await api('makePost',[id],120000);
+  }catch(e){
+    // --- Fallback: ถ้า API ล่ม ให้สร้างจากข้อมูลในเครื่อง ---
+    var it=find(id);
+    if(it){
+      S.post[id]={
+        hook: "เรื่องนี้กำลังมาแรง! 🔥",
+        body: (it.facts||it.title_th||it.title).slice(0, 150) + "...",
+        q: "คุณคิดว่าเรื่องนี้เป็นยังไงบ้าง? คอมเมนต์มาเลย 👇",
+        tags: ["#ข่าววันนี้", "#ดราม่า", "#เล่าข่าว", "#ส่งข่าว", "#ประเด็นร้อน"]
+      };
+      toast('Gemini ตอบช้า ใช้โพสต์สำรองให้ก่อนนะ');
+    } else { toast(e.message); }
+  }
+  // เก็บแค่ 40 รายการล่าสุด
+  var k=Object.keys(S.post);
+  if(k.length>40) delete S.post[k[0]];
+  LS.set('sk_post',S.post);
   delete S.posting[id];render(true);
 }
 async function doRetell(id){
@@ -337,8 +372,40 @@ var ACT={
   save:function(id){
     var i=-1;S.saved.forEach(function(x,k){if(x.id===id)i=k});
     if(i>=0)S.saved.splice(i,1);
-    else{var it=find(id);if(it)S.saved.unshift(JSON.parse(JSON.stringify(it)))}
+    else{
+      var it=find(id);
+      if(it){
+        var copy = JSON.parse(JSON.stringify(it));
+        copy.status = 'todo'; // ค่าเริ่มต้น
+        copy.note = '';       // โน้ตเริ่มต้น
+        S.saved.unshift(copy);
+      }
+    }
     LS.set('sk_saved',S.saved);render(true);
+  },
+  updSave:function(id, field, val){
+    S.saved.forEach(function(x){ if(x.id===id) x[field]=val; });
+    LS.set('sk_saved',S.saved);
+  },
+  size:function(){
+    var total = 0;
+    for(var k in localStorage){
+      if(localStorage.hasOwnProperty(k)){
+        total += (localStorage[k].length + k.length) * 2; // ประมาณการเป็น bytes (UTF-16)
+      }
+    }
+    var mb = (total / (1024*1024)).toFixed(2);
+    $('#sizeOut').innerHTML = 'ใช้พื้นที่ไปทั้งหมด <b>'+mb+' MB</b> (สูงสุด 5 MB)<br>ถ้าใกล้เต็ม แนะนำให้ล้างแชทหรือข่าวที่เก็บไว้';
+  },
+  hist:function(){
+    var keys = Object.keys(S.post);
+    if(!keys.length){ toast('ยังไม่มีประวัติการสร้างโพสต์'); return; }
+    var txt = 'ประวัติโพสต์ล่าสุด:\n\n';
+    keys.slice(-10).reverse().forEach(function(k){
+      txt += '- ' + S.post[k].hook + '\n';
+    });
+    txt += '\n(ดูทั้งหมดได้ใน Console)';
+    alert(txt);
   },
   go:function(id){go(id)},
   chip:function(id){send(id)},
@@ -367,7 +434,19 @@ $('#page').addEventListener('click',function(e){
   var f=ACT[a.getAttribute('data-act')];
   if(f)f(a.getAttribute('data-id'),a);
 });
-$('#page').addEventListener('change',function(e){if(e.target.id==='cu'||e.target.id==='ck')saveCfg()});
+$('#page').addEventListener('change',function(e){
+  if(e.target.id==='cu'||e.target.id==='ck') saveCfg();
+  var act = e.target.getAttribute('data-act');
+  if(act==='status' || act==='note'){
+    ACT.updSave(e.target.getAttribute('data-id'), act, e.target.value);
+  }
+});
+$('#page').addEventListener('input',function(e){
+  var act = e.target.getAttribute('data-act');
+  if(act==='note'){
+    ACT.updSave(e.target.getAttribute('data-id'), act, e.target.value);
+  }
+});
 Array.prototype.forEach.call(document.querySelectorAll('nav button'),function(b){b.addEventListener('click',function(){S.wipeArm=false;go(b.getAttribute('data-tab'))})});
 $('#rf').addEventListener('click',function(){loadNews()});
 $('#snd').addEventListener('click',function(){send($('#msg').value)});
