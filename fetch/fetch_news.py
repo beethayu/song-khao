@@ -173,6 +173,15 @@ def main():
     if not items:
         return 1
     print("ingest:", call("ingest", [items]))
+    for i in range(3):  # แปลหัวข้อข่าวโลกเป็นไทยทีละ 20 หัวข้อ (พลาดไม่ล้มทั้งงาน)
+        try:
+            r = call("translatePending", [20])
+        except Exception as e:
+            print("แปลหัวข้อล้มเหลว:", str(e)[:80])
+            break
+        print(f"แปล รอบ {i + 1}:", r)
+        if r.get("left", 0) == 0 or r.get("done", 0) == 0:
+            break
     for i in range(4):  # ให้ลุงเล่าทีละ 6 ข่าว สูงสุด 24 ข่าวต่อรอบ
         r = call("retellPending", [6])
         print(f"retell รอบ {i + 1}:", r)

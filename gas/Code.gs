@@ -5,7 +5,7 @@
  */
 
 const SHEET_NAME = 'news';
-const HEAD = ['id', 'region', 'title', 'source', 'url', 'metric', 'score', 'ts', 'snippet', 'lung', 'tag'];
+const HEAD = ['id', 'region', 'title', 'source', 'url', 'metric', 'score', 'ts', 'snippet', 'lung', 'tag', 'title_th'];
 const KEEP_DAYS = 4;
 const MAX_ROWS = 600;
 const MODELS = ['gemini-3.5-flash', 'gemini-3.5-flash-lite'];
@@ -49,6 +49,7 @@ const API = {
   list: list,
   ingest: ingest,
   retellPending: retellPending,
+  translatePending: translatePending,
   retell: retell,
   chat: chat
 };
@@ -79,6 +80,9 @@ function sheet_() {
   if (sh.getLastRow() === 0) {
     sh.getRange(1, 1, 1, HEAD.length).setValues([HEAD]);
     sh.setFrozenRows(1);
+  } else if (sh.getRange(1, HEAD.length).getValue() !== HEAD[HEAD.length - 1]) {
+    // เพิ่มคอลัมน์ใหม่ให้ชีตเดิม
+    sh.getRange(1, 1, 1, HEAD.length).setValues([HEAD]);
   }
   return sh;
 }
@@ -98,7 +102,7 @@ function pub_(o) {
   return {
     id: o.id, region: o.region, title: o.title, source: o.source, url: o.url,
     metric: o.metric, score: Number(o.score) || 0, ts: Number(o.ts) || 0,
-    lung: o.lung || '', tag: o.tag || ''
+    lung: o.lung || '', tag: o.tag || '', title_th: o.title_th || ''
   };
 }
 
@@ -136,7 +140,7 @@ function ingest(items) {
         upd++;
       } else {
         add.push([it.id, it.region, it.title, it.source || '', it.url || '', it.metric || '',
-          Number(it.score) || 0, now, String(it.snippet || '').slice(0, 600), '', it.tag || '']);
+          Number(it.score) || 0, now, String(it.snippet || '').slice(0, 600), '', it.tag || '', '']);
         byId[it.id] = { _row: -1 };
       }
     });
@@ -159,6 +163,32 @@ function prune_(sh) {
   del.reverse().forEach(function (r) { sh.deleteRow(r); });
   const left = sh.getLastRow() - 1;
   if (left > MAX_ROWS) sh.deleteRows(2, left - MAX_ROWS);
+}
+
+// ---------- แปลหัวข้อข่าวโลกเป็นไทย (ครั้งเดียวหลายหัวข้อ) ----------
+function translatePending(limit) {
+  const sh = sheet_();
+  const lim = Math.min(Number(limit) || 20, 30);
+  const since = Date.now() - 2 * 24 * 3600 * 1000;
+  const todo = rows_(sh).filter(function (o) {
+    return o.region === 'world' && o.title && !o.title_th && Number(o.ts) >= since;
+  });
+  todo.sort(function (a, b) { return Number(b.score) - Number(a.score); });
+  const batch = todo.slice(0, lim);
+  if (!batch.length) return { done: 0, left: 0 };
+  const sys = 'คุณเป็นบรรณาธิการข่าว แปลหัวข้อข่าวภาษาอังกฤษเป็นภาษาไทยให้อ่านลื่นแบบพาดหัวข่าว ' +
+    'แปลตรงตามต้นฉบับ ห้ามเติมความเห็นหรือรายละเอียดที่ไม่มี ชื่อคน/องค์กรใช้ตามที่คนไทยนิยมเรียก ถ้าไม่แน่ใจให้คงชื่อเป็นอังกฤษ ' +
+    'ตอบเป็น JSON array ของสตริงเท่านั้น จำนวนและลำดับตรงกับที่ให้';
+  const prompt = JSON.stringify(batch.map(function (o) { return o.title; }));
+  const txt = gemini_(sys, [{ role: 'user', parts: [{ text: prompt }] }], 0.2, true);
+  const arr = JSON.parse(txt);
+  if (!Array.isArray(arr) || arr.length !== batch.length) throw new Error('แปลไม่ครบ ลองใหม่');
+  let done = 0;
+  batch.forEach(function (o, i) {
+    const t = String(arr[i] || '').trim();
+    if (t) { sh.getRange(o._row, 12).setValue(t); done++; }
+  });
+  return { done: done, left: Math.max(todo.length - done, 0) };
 }
 
 // ---------- ลุงเล่า ----------
@@ -229,7 +259,7 @@ function chat(id, text, hist, heads) {
 }
 
 // ---------- Gemini ----------
-function gemini_(system, contents, temp) {
+function gemini_(system, contents, temp, asJson) {
   const key = PropertiesService.getScriptProperties().getProperty('GEMINI_KEY');
   if (!key) throw new Error('ยังไม่ได้ตั้ง GEMINI_KEY');
   const payload = {
@@ -237,6 +267,7 @@ function gemini_(system, contents, temp) {
     contents: contents,
     generationConfig: { temperature: temp, thinkingConfig: { thinkingLevel: 'minimal' } }
   };
+  if (asJson) payload.generationConfig.responseMimeType = 'application/json';
   for (let m = 0; m < MODELS.length; m++) {
     for (let t = 0; t < 2; t++) {
       const res = UrlFetchApp.fetch(
