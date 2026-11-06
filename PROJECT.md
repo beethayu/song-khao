@@ -37,6 +37,7 @@ index.html (GitHub Pages)  → POST text/plain {fn,args,k} → {ok,result}
 - ทดสอบแล้ว: หน้าเว็บด้วย playwright 390×844 + API จำลอง (เปิดข่าว/ให้ลุงเล่า/แชท/เก็บ/ตั้งค่าผ่าน) · ตัวอ่าน Trends ด้วย XML จำลอง · syntax gas/py/js
 - **ยังไม่เคยทดสอบกับของจริง**: การดึง RSS/Reddit, Gemini (ชื่อรุ่น gemini-3.5-flash / -flash-lite + thinkingLevel minimal จากสกิล — ถ้า 400 ให้ลองปรับ), clasp deploy, Pages
 - deploy-gas ถ้ายังไม่มี Secrets จะข้ามพร้อมคำเตือน (ไม่ล้ม)
+- **2026-11-06 clasp push ขึ้น Apps Script สำเร็จแล้ว** (2 ไฟล์) · CLASPRC_JSON ของผู้ใช้เป็นรูปแบบ `tokens` → ต้องใช้ clasp@3 (clasp@2 ล้มด้วย "reading 'access_token'") · workflow เลือกเวอร์ชันเองตามคีย์ · ถัดไป: ผู้ใช้ deploy เว็บแอปครั้งแรกในหน้า Apps Script แล้วตั้ง Secret DEPLOYMENT_ID
 - รอผู้ใช้: สร้าง Apps Script โปรเจกต์ใหม่ + ตั้ง Secrets + Script Properties + deploy web app + เปิด Pages (ดูขั้นตอนด้านล่าง)
 
 ## ขั้นที่ผู้ใช้ต้องทำ (Claude ทำเองไม่ได้)
