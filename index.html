@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='6.6 · 2026-11-09';
+var VERSION='6.7 · 2026-11-09';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -466,26 +466,34 @@ function splitTh(t){ // แบ่งข้อความยาวเป็น 2
   for(var i=0;i<w.length-1;i++){acc+=w[i];var d=Math.abs(acc.length-t.length/2);if(!best||d<best.d)best={d:d,a:acc}}
   return best&&best.a.trim()&&best.a.length<t.length?[best.a.trim(),t.slice(best.a.length).trim()]:[t];
 }
+// ชุดสีหมุนตามข่าว (คงที่ต่อข่าว) ให้ภาพแต่ละข่าวไม่ซ้ำกัน · ตัวหนังสือยังเป็นสไตล์เดิม
+var PAL={
+  alert:[['deep crimson to black','yellow'],['charcoal black with fiery orange glow','red'],['stormy dark purple to black','yellow'],['dark maroon with amber light','orange']],
+  other:[['deep royal blue','red'],['rich purple to magenta','gold'],['dark teal to emerald green','orange'],['midnight navy with cyan glow','yellow'],['deep burgundy to wine red','gold'],['dark forest green to teal','yellow']]
+};
+function hashStr(t){var h=0;t=String(t||'');for(var i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))|0;return Math.abs(h)}
 function imgPromptOf(p){
   var al=p.cat==='alert';
-  var bg=al?'dark red':'dark blue';
-  var mood=al?'urgent red-black-yellow breaking news warning':'vibrant red-blue Thai breaking news';
+  var h=hashStr(p.head+'|'+p.sub),list=al?PAL.alert:PAL.other,pal=list[h%list.length];
+  var bg=pal[0],acc=pal[1],side=(h>>3)%2?'right':'left',other=side==='left'?'right':'left';
+  var mood=al?'urgent breaking news warning':'vibrant Thai breaking news';
   var vis=p.visual||({alert:'dark storm clouds with heavy rain, lightning and a warning sign',welfare:'a smartphone and a stylized welfare card with gold coins',econ:'stacks of coins, banknotes and a rising price arrow'}[p.cat])||'a smartphone with news icons';
-  var decor=al?'faint rain streaks, a soft lightning glow and blurred rising water':'a softly waving Thai flag ribbon, warm bokeh lights and a few blurred gold coins';
+  var decor=p.decor||(al?'faint rain streaks, a soft lightning glow and blurred rising water':'warm bokeh lights and a few blurred gold coins');
+  var scene=p.scene?(' with '+p.scene):'';
   var L=[],n=1;
   function line(desc,txt){L.push('- Line '+(n++)+': '+desc+' "'+txt+'"')}
   L.push('Vertical 9:16 mobile thumbnail for a Thai news video, mood: '+mood+'. If a reference image is attached, follow its layout and spacing.');
-  L.push('ONE seamless full-frame background from top to bottom: a dynamic '+bg+' gradient with glowing light rays, sparkles and abstract '+(al?'yellow':'red')+' accent streaks flowing through the whole image. No dividing line, no horizontal split, no separate panels or blocks, no change of background between top and bottom.');
+  L.push('ONE seamless full-frame background from top to bottom: a dynamic '+bg+' gradient'+scene+', glowing light rays, sparkles and abstract '+acc+' accent streaks flowing through the whole image. No dividing line, no horizontal split, no separate panels or blocks, no change of background between top and bottom.');
   L.push('Group the large, vibrant 3D Thai text and the illustration in the upper ~60% of the frame; the lower ~40% stays free of text so a video presenter can be placed there later, but it is the same continuous background.');
   L.push('Render every Thai word exactly as written below, with correct spelling, vowels and tone marks. Keep each line as one line and never split a word across lines. Do not add any other text anywhere.');
-  L.push('');L.push('Text, top to bottom (centered, right side of the illustration where needed):');
+  L.push('');L.push('Text, top to bottom (centered; lines next to the illustration shift slightly to the '+other+'):');
   if(p.label)line('a slanted '+(al?'yellow banner with 3D red':'red banner with 3D white')+' text',p.label);
   line('massive 3D golden-yellow text with thick black and red outlines',p.head);
   splitTh(p.sub).forEach(function(t,i){if(t)line((i?'3D yellow text with white and dark outline':'3D white text with yellow and dark outline'),t)});
   if(p.big)L.push('- Line '+(n++)+': a giant 3D red number "'+p.big+'" with a thick black and white outline'+(p.unit?', followed on the same line by 3D yellow text "'+p.unit+'"':''));
   if(p.pill)line('a rounded '+(al?'black and yellow':'red')+' badge (not a full-width bar) with 3D white text',p.pill);
   L.push('');L.push('Illustration:');
-  L.push('- On the middle-left, a 3D illustration of '+vis+', compact, inside the top 60%, not covering any text. Any card, phone screen or document in the illustration must show only blank shapes, lines and icons, with no letters or words.');
+  L.push('- On the middle-'+side+', a 3D illustration of '+vis+', compact, inside the top 60%, not covering any text. Any card, phone screen or document in the illustration must show only blank shapes, lines and icons, with no letters or words.');
   L.push('');L.push('Lower ~40% (presenter space, same background):');
   L.push('- No text and no large objects here. The light rays and sparkles from above continue down naturally so the image feels like one piece.');
   L.push('- Only along the very bottom edge, small softly blurred decorative elements: '+decor+'. Keep the center clear.');

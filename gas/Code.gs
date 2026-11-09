@@ -460,7 +460,7 @@ function makeNearPost_(o) {
   const tone = o.mood === 'serious' ? 'มีผู้ได้รับผลกระทบรุนแรง: น้ำเสียงสุภาพ ห่วงใย ห้ามมุก' : 'น้ำเสียงตรง กระชับ ห่วงใย ไม่ขู่เกินจริง';
   const labelHint = { alert: '"เตือน!" "ด่วน!" "เตรียมรับมือ!"', welfare: '"ข่าวดี" (เฉพาะข่าวที่ชาวบ้านได้ประโยชน์) หรือ "ต้องรู้!"', econ: '"ต้องรู้!" "กระเป๋าสะเทือน!" หรือ "ข่าวดี" (ถ้าราคาลด)' }[cat] || '"ต้องรู้!"';
   const prompt = 'ทำโพสต์ Facebook + ข้อความบนภาพปกคลิปแนวตั้ง จากข่าวนี้ ตอบเป็น JSON เท่านั้น รูปแบบ\n' +
-    '{"hook":"","label":"","head":"","sub":"","big":"","unit":"","pill":"","pts":["","",""],"q":"","tags":["","","","",""],"visual":""}\n' +
+    '{"hook":"","label":"","head":"","sub":"","big":"","unit":"","pill":"","pts":["","",""],"q":"","tags":["","","","",""],"visual":"","scene":"","decor":""}\n' +
     'ข้อความบนภาพปก (สไตล์ปกคลิปข่าวไวรัล อ่านจบใน 2 วินาที คนดูต้องรู้ทันทีว่าเรื่องอะไร ได้/เสียอะไร):\n' +
     '- label: ป้ายมุมบน 2–12 ตัวอักษร เช่น ' + labelHint + '\n' +
     '- head: คำหลักของเรื่อง ตัวใหญ่สุด 3–14 ตัวอักษร เป็นคำที่ชาวบ้านใช้เรียก เช่น "บัตรคนจน" "บัตรทอง" "ฝนถล่มใต้" "ค่าไฟ"\n' +
@@ -472,6 +472,8 @@ function makeNearPost_(o) {
     'ห้ามเป็นประโยคทั่วไปอย่าง "ต้องจับตา" "ลุงจะมาเล่าต่อ" ถ้าข้อเท็จจริงมีไม่ถึง 3 ข้อ ให้ส่งน้อยกว่า 3 ข้อ\n' +
     '- q: ประโยคชวนคอมเมนต์/ส่งต่อ 1 ประโยค\n- tags: แฮชแท็กไทย 5 อัน ขึ้นต้นด้วย # ไม่มีเว้นวรรค\n' +
     '- visual: ภาษาอังกฤษ 1 วลี บรรยายภาพประกอบ 3D ที่สื่อเรื่องนี้ (สิ่งของ/สัญลักษณ์ ไม่ใช่คน) เช่น "a smartphone showing medical app icons and a gold health card being tapped by a cartoon hand" ห้ามใบหน้าคนจริง ห้ามโลโก้หน่วยงาน ห้ามธงชาติ\n' +
+    '- scene: ภาษาอังกฤษ 1 วลี บรรยายบรรยากาศพื้นหลังที่เข้ากับเรื่องนี้โดยเฉพาะ (ไม่ต้องบอกสี) เช่น ข่าวโกงออนไลน์ "glowing digital code, padlocks and red alert symbols" ข่าวสุขภาพ "soft medical cross bokeh and heartbeat lines" ข่าวน้ำมัน "blurred gas station lights and fuel drops"\n' +
+    '- decor: ภาษาอังกฤษ 1 วลี ของตกแต่งเล็ก ๆ เบลอ ๆ ที่ขอบล่างสุดของภาพ ให้เข้ากับเรื่อง (ไม่ต้องเป็นธงหรือเหรียญทุกครั้ง) เช่น "scattered warning triangles and broken chain links"\n' +
     'ทุกช่อง: ใช้เฉพาะข้อเท็จจริงในข้อมูลด้านล่าง ห้ามแต่งตัวเลข วันที่ จังหวัด ถ้าหัวข่าวเป็นคำถาม/ข้อกล่าวหา ห้ามใช้ label "ข่าวดี" และห้ามฟันธง\n' +
     tone + '\n\n' + newsInfo_(o);
   const raw = gemini_(LUNG, [{ role: 'user', parts: [{ text: prompt }] }], 0.5, true);
@@ -485,7 +487,7 @@ function makeNearPost_(o) {
     kind: 'near', cat: cat, hook: cut(j.hook, 70), label: cut(j.label, 14), head: cut(j.head, 18), sub: cut(j.sub, 32),
     big: cut(j.big, 10), unit: cut(j.unit, 14), pill: cut(j.pill, 26), pts: pts,
     body: pts.map(function (t) { return '• ' + t; }).join('\n'),
-    q: cut(j.q, 200), tags: tags, src: String(o.source || ''), visual: cut(j.visual, 300)
+    q: cut(j.q, 200), tags: tags, src: String(o.source || ''), visual: cut(j.visual, 300), scene: cut(j.scene, 200), decor: cut(j.decor, 200)
   };
 }
 
