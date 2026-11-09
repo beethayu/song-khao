@@ -176,6 +176,50 @@ SOURCES += [("gnews-near-" + c + "-" + str(i), (lambda q=q, l=l, c=c: gnews(q, "
             for i, (c, q, l) in enumerate(NEAR_Q)]
 
 
+def tmd_cap(limit=3):
+    """ประกาศเตือนทางการของกรมอุตุฯ (CAP) + รายชื่อจังหวัดจากไฟล์ประกาศ ห้ามให้ AI เดาจังหวัดเอง"""
+    from datetime import datetime, timezone
+    root = ET.fromstring(get("https://www.tmd.go.th/api/xml/CAP"))
+    out = []
+    for i, it in enumerate(root.iter("item")):
+        if len(out) >= limit:
+            break
+        kind = re.sub(r"\s+", " ", it.findtext("title") or "").strip()
+        link = (it.findtext("link") or "").strip()
+        guid = (it.findtext("guid") or link).strip()
+        desc = re.sub(r"<[^>]+>", " ", it.findtext("description") or "")
+        desc = re.sub(r"\s+", " ", desc).strip()
+        if not kind or not link:
+            continue
+        provs, exp = [], None
+        try:
+            cap = get(link)
+            cap = cap.decode("utf-8-sig", "replace") if isinstance(cap, bytes) else cap
+            for a in re.findall(r"<(?:\w+:)?areaDesc>([^<]+)</", cap):
+                for p in re.split(r"[,\s]+", a.strip()):
+                    if p and p not in provs:
+                        provs.append(p)
+            m = re.search(r"<(?:\w+:)?expires>([^<]+)</", cap)
+            if m:
+                exp = datetime.fromisoformat(m.group(1).strip())
+        except Exception:
+            pass
+        if exp and exp < datetime.now(timezone.utc):
+            continue  # ประกาศหมดอายุแล้ว
+        head = "กรมอุตุฯ ประกาศเตือน" + kind
+        if provs:
+            head += " " + " ".join(provs[:5]) + (f" และอีก {len(provs) - 5} จังหวัด" if len(provs) > 5 else "")
+        snip = (("จังหวัดที่ประกาศเตือน: " + " ".join(provs) + " | ") if provs else "") + desc
+        out.append(dict(
+            id=mid("near", guid), region="near", title=head[:200], source="กรมอุตุนิยมวิทยา", url=link,
+            raw=1000 - i, metric="ประกาศเตือนทางการ · กรมอุตุฯ", snippet=snip[:600], tag="alert",
+        ))
+    return out
+
+
+SOURCES.append(("tmd-cap", tmd_cap))
+
+
 RSS_TH = [
     ("thairath", "https://www.thairath.co.th/rss/news", "ไทยรัฐ"),
     ("khaosod", "https://www.khaosod.co.th/feed", "ข่าวสด"),
