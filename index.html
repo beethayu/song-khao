@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='6 · 2026-11-09';
+var VERSION='6.1 · 2026-11-09';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -270,6 +270,7 @@ function itemHtml(it,i,hot){
       if(!it.lung&&!S.retelling[it.id])b+='<button class="btn acc" data-act="retell" data-id="'+esc(it.id)+'">ให้ลุงเล่า</button>';
       if(!S.posting[it.id])b+='<button class="btn acc" data-act="post" data-id="'+esc(it.id)+'">'+(S.post[it.id]?'ทำโพสต์ใหม่':'สร้างโพสต์')+'</button>';
       if(S.post[it.id])b+='<button class="btn" data-act="cpost" data-id="'+esc(it.id)+'">คัดลอกโพสต์</button>';
+      if(S.post[it.id]&&S.post[it.id].imgPrompt)b+='<button class="btn" data-act="cimg" data-id="'+esc(it.id)+'">คัดลอกคำสั่งสร้างภาพ</button>';
       b+='<button class="btn pri" data-act="ask" data-id="'+esc(it.id)+'">ถามลุง</button>';
     }
     
@@ -387,7 +388,7 @@ function wrapTh(x,text,maxW){
   return lines;
 }
 // การ์ดข่าวใกล้ตัว: ป้ายแดง พาดหัวเหลืองตัวใหญ่ สรุป 3 ข้อสีขาว + ที่มา
-function postImgNear(p){
+function postImgNearOld(p){
   var W=1080,c=document.createElement('canvas');c.width=W;c.height=W;var x=c.getContext('2d');
   var F='-apple-system,"Thonburi","Sarabun",sans-serif';
   x.fillStyle='#101820';x.fillRect(0,0,W,W);
@@ -416,10 +417,51 @@ function postImgNear(p){
   x.fillText('ส่งข่าว · ลุงเล่า',120,W-120);
   return c.toDataURL('image/png');
 }
+// ปกคลิปแนวตั้ง 9:16 สไตล์ข่าวไวรัล: ป้าย + คำหลักตัวยักษ์ + แถบสิ่งที่เกิด + ตัวเลขเด่น + แถบล่าง · เว้นล่าง ~38% ไว้วางคนเล่าใน CapCut
+function postImgCover(p){
+  var W=1080,H=1920,c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d');
+  var F='-apple-system,"Thonburi","Sarabun",sans-serif';
+  var alert=p.cat==='alert';
+  var g=x.createLinearGradient(0,0,0,H);
+  if(alert){g.addColorStop(0,'#3a0508');g.addColorStop(.55,'#7a0d14');g.addColorStop(1,'#1c0204')}
+  else{g.addColorStop(0,'#071c4d');g.addColorStop(.55,'#0f3a9e');g.addColorStop(1,'#04102e')}
+  x.fillStyle=g;x.fillRect(0,0,W,H);
+  // แสงฟุ้งกลางภาพ
+  var rg=x.createRadialGradient(W/2,620,40,W/2,620,700);rg.addColorStop(0,'rgba(255,255,255,.18)');rg.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=rg;x.fillRect(0,0,W,H);
+  x.textAlign='center';x.textBaseline='middle';x.lineJoin='round';
+  function fit(t,w,max,min){var z=max;for(;z>min;z-=4){x.font='900 '+z+'px '+F;if(x.measureText(t).width<=w)break}return z}
+  function txt(t,cx,cy,size,fill,stroke,sw){x.font='900 '+size+'px '+F;if(stroke){x.strokeStyle=stroke;x.lineWidth=sw;x.strokeText(t,cx,cy)}x.fillStyle=fill;x.fillText(t,cx,cy)}
+  function band(cx,cy,w,h,col,rot){x.save();x.translate(cx,cy);x.rotate(rot);x.fillStyle=col;x.beginPath();x.moveTo(-w/2+18,-h/2);x.lineTo(w/2,-h/2);x.lineTo(w/2-18,h/2);x.lineTo(-w/2,h/2);x.closePath();x.fill();x.restore()}
+  function lines(t,w,size){x.font='900 '+size+'px '+F;return wrapTh(x,t,w)}
+  var y=190;
+  // ป้าย (ข่าวดี/เตือน!)
+  if(p.label){var ls=fit(p.label,620,150,80);x.font='900 '+ls+'px '+F;var lw=x.measureText(p.label).width+90;
+    band(W/2,y,lw,ls*1.35,alert?'#ffd400':'#e3131b',-0.05);
+    x.save();x.translate(W/2,y);x.rotate(-0.05);txt(p.label,0,6,ls,alert?'#b0000b':'#fff','rgba(0,0,0,.25)',6);x.restore();
+    y+=ls*0.75+40}
+  // คำหลักตัวยักษ์
+  var hs=fit(p.head,W-110,230,120),hl=x.measureText(p.head).width>W-110?lines(p.head,W-110,hs):[p.head];
+  hl.forEach(function(l){y+=hs*0.62;txt(l,W/2,y,hs,'#ffd400','#3b1d00',22);y+=hs*0.62});
+  // แถบสิ่งที่เกิด
+  if(p.sub){y+=30;var ss=fit(p.sub,W-170,110,60),sl=x.measureText(p.sub).width>W-170?lines(p.sub,W-170,ss):[p.sub];
+    sl.forEach(function(l){band(W/2,y+ss*0.62,W-90,ss*1.3,alert?'#111':'#e3131b',-0.02);txt(l,W/2,y+ss*0.66,ss,'#fff',null,0);y+=ss*1.4})}
+  // ตัวเลขเด่น
+  if(p.big){y+=40;var bs=fit(p.big,W-260,330,150);y+=bs*0.5;txt(p.big,W/2,y,bs,alert?'#ffd400':'#ff2a2a','#fff',26);y+=bs*0.55;
+    if(p.unit){var us=fit(p.unit,W-200,96,60);y+=us*0.45;txt(p.unit,W/2,y,us,'#fff','#000',12);y+=us*0.6}}
+  // แถบล่าง (pill)
+  if(p.pill){y+=40;var ps=fit(p.pill,W-260,84,50);x.font='900 '+ps+'px '+F;var pw=Math.min(x.measureText(p.pill).width+110,W-80),ph=ps*1.45;
+    x.fillStyle='#ffd400';x.beginPath();x.moveTo(W/2-pw/2+ph/2,y);x.arcTo(W/2+pw/2,y,W/2+pw/2,y+ph,ph/2);x.arcTo(W/2+pw/2,y+ph,W/2-pw/2,y+ph,ph/2);x.arcTo(W/2-pw/2,y+ph,W/2-pw/2,y,ph/2);x.arcTo(W/2-pw/2,y,W/2+pw/2,y,ph/2);x.closePath();x.fill();
+    txt(p.pill,W/2,y+ph/2+4,ps,'#0a1f55',null,0);y+=ph}
+  // ด้านล่างเว้นว่างไว้วางคนเล่าใน CapCut (ไม่วาดกรอบ จะได้ไม่ติดในภาพจริง)
+  x.textAlign='left';x.fillStyle='rgba(255,255,255,.75)';x.font='500 34px '+F;
+  var src=p.src?'ที่มา: '+p.src:'';while(src.length>8&&x.measureText(src).width>W-140)src=src.slice(0,-2);
+  if(src)x.fillText(src,70,H-95);x.fillText('ส่งข่าว · ลุงเล่า',70,H-50);
+  return c.toDataURL('image/png');
+}
 function postImg(p){
   var key=(p.kind||'')+'|'+p.hook+'|'+(p.body||'').length;
   if(IMGC[key])return IMGC[key];
-  if(p.kind==='near')return IMGC[key]=postImgNear(p);
+  if(p.kind==='near')return IMGC[key]=(p.head?postImgCover(p):postImgNearOld(p));
   return IMGC[key]=postImgBase(p);
 }
 function postImgBase(p){
@@ -497,6 +539,7 @@ var ACT={
   tog:function(id){S.open[id]=!S.open[id];render(true)},
   retell:function(id){doRetell(id)},
   post:function(id){doPost(id)},
+  cimg:function(id,btn){var p=S.post[id];if(!p||!p.imgPrompt)return;clip(p.imgPrompt).then(function(){btn.textContent='คัดลอกแล้ว ✓ ไปวางใน Gemini/ChatGPT';setTimeout(function(){btn.textContent='คัดลอกคำสั่งสร้างภาพ'},2500)})},
   cpost:function(id,btn){var p=S.post[id];if(!p)return;clip(postText(p)).then(function(){btn.textContent='คัดลอกแล้ว ✓';setTimeout(function(){btn.textContent='คัดลอกโพสต์'},1500)},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่ข้อความ')})},
   ask:function(id){var it=find(id);if(!it)return;S.ctx={id:id,title:it.title_th||it.title};S.chatErr='';go('chat')},
   copy:function(id,btn){
