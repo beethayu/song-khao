@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='7.2 · 2026-11-09';
+var VERSION='7.3 · 2026-11-09';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -526,7 +526,7 @@ function vidClipPrompt(it,i,segs){
   var ex=it.mood==='serious'?'calm, concerned and respectful expression, gentle voice':(cat==='alert'||cat==='welfare'||cat==='econ')?'serious but caring expression, clear firm voice':'lively, warm expression with a slight knowing smile, expressive voice';
   var bgl=S.vgreen?'Keep the plain, solid bright green chroma-key background exactly as in the attached image: evenly lit, flat, no shadows, no objects, no color change, so it can be removed later.':'';
   return ['Vertical 9:16 video, 8 seconds. Use the attached image as the presenter (keep the same face and outfit): '+ch+'.'+(bgl?' '+bgl:''),
-    'He looks straight into the camera and speaks Thai naturally with accurate lip-sync, '+ex+', small natural hand gestures kept close to the body. Medium shot, static camera, soft even light.'+(i===n-1?' He ends with a small nod.':''),
+    'He looks straight into the camera and speaks Thai naturally with accurate lip-sync, '+ex+', small natural hand gestures kept close to the body. Medium shot, static camera, soft even light. He starts and ends in the same neutral pose as the attached image (facing the camera, hands resting together in front), so clips can be joined smoothly. He starts speaking immediately with no pause and stops right at the end.'+(i===n-1?' He ends with a small nod.':''),
     'He says in Thai: "'+segs[i]+'"',
     'No subtitles, no on-screen text, no background music, no other people.'].join('\n');
 }
