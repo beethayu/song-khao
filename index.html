@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='6.8 · 2026-11-09';
+var VERSION='6.9 · 2026-11-09';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -271,7 +271,10 @@ function itemHtml(it,i,hot){
       if(!it.lung&&!S.retelling[it.id])b+='<button class="btn acc" data-act="retell" data-id="'+esc(it.id)+'">ให้ลุงเล่า</button>';
       if(!S.posting[it.id])b+='<button class="btn acc" data-act="post" data-id="'+esc(it.id)+'">'+(S.post[it.id]?'ทำโพสต์ใหม่':'สร้างโพสต์')+'</button>';
       if(S.post[it.id])b+='<button class="btn" data-act="cpost" data-id="'+esc(it.id)+'">คัดลอกโพสต์</button>';
-      if(S.post[it.id]&&S.post[it.id].head)b+='<button class="btn acc" data-act="cimg" data-id="'+esc(it.id)+'">คัดลอกคำสั่งสร้างภาพ</button>';
+      if(S.post[it.id]&&S.post[it.id].head){
+        b+='<button class="btn acc" data-act="cimg" data-id="'+esc(it.id)+'">คัดลอกคำสั่งสร้างภาพ</button>';
+        b+='<button class="btn acc" data-act="cimg2" data-id="'+esc(it.id)+'">คำสั่งภาพ: ฉากจริง'+(S.post[it.id].person?' + คนในข่าว':'')+'</button>';
+      }
       if(it.lung)b+='<button class="btn acc" data-act="cvid" data-id="'+esc(it.id)+'">คัดลอกคำสั่งทำคลิป</button>';
       b+='<button class="btn pri" data-act="ask" data-id="'+esc(it.id)+'">ถามลุง</button>';
     }
@@ -531,6 +534,34 @@ function vidPromptOf(it){
   });
   return L.join('\n').trim();
 }
+// แบบที่ 2: ฉากจริงเป็นพื้นหลัง + คนในข่าวจากรูปที่ผู้ใช้แนบ (สไตล์เพจข่าวไวรัล) · ตัวหนังสือวางแบบเดิม · ไม่ให้ AI ปั้นหน้าคนจริงเอง
+function imgStoryPromptOf(p){
+  var al=p.cat==='alert';
+  var place=p.place||p.scene||'a Thai street scene related to the story';
+  var L=[],n=1;
+  function line(desc,txt){L.push('- Line '+(n++)+': '+desc+' "'+txt+'"')}
+  L.push('Vertical 9:16 mobile thumbnail for a Thai news video, vibrant Thai breaking-news style. If a reference image is attached for layout, follow its layout.');
+  L.push('Background: a realistic, softly blurred scene of '+place+', no people in the background, slightly darkened behind the text so the text stays readable. One seamless image, no dividing lines or panels.');
+  L.push('Render every Thai word exactly as written below, with correct spelling, vowels and tone marks. Keep each line as one line and never split a word across lines. Do not add any other text except the small caption mentioned at the end.');
+  L.push('');L.push('Text in the upper half, top to bottom, on bold torn-paper style banners ('+(al?'red, black and yellow':'red, navy blue and yellow')+'):');
+  if(p.label)line('a red banner with a megaphone icon and 3D white text',p.label);
+  line('massive 3D '+(al?'yellow':'yellow')+' text with thick dark outline',p.head);
+  splitTh(p.sub).forEach(function(t,i){if(t)line(i?'navy blue text on a yellow brush-stroke banner':'white text on a red banner',t)});
+  if(p.big)L.push('- Line '+(n++)+': a giant 3D number "'+p.big+'"'+(p.unit?' with "'+p.unit+'"':'')+' in a rounded red badge');
+  if(p.pill)line('white text on a dark navy banner',p.pill);
+  L.push('');
+  if(p.person){
+    L.push('Person: place the real person from the attached photo ('+p.person+') on the lower-left, as a clean cut-out with a thin white outline, from the chest up.');
+    L.push('Keep the face, expression and clothing exactly as in the attached photo. Do not change the expression, do not add gestures or props in their hands, and do not generate a new face.');
+    L.push('If no photo is attached, leave the lower-left empty instead of drawing a person.');
+  }else{
+    L.push('Lower-left: a 3D illustration of '+(p.visual||'objects related to the story')+', no people.');
+  }
+  L.push('Lower-center and lower-right: keep clear (space for a video presenter added later), only the blurred background.');
+  L.push('Small caption in the bottom-left corner, small white text: "ภาพประกอบ"');
+  L.push('');L.push('Do not include: real government or agency logos, watermarks, any other people, any text other than listed.');
+  return L.join('\n');
+}
 function postImg(p){
   var key=(p.kind||'')+'|'+p.hook+'|'+(p.body||'').length;
   if(IMGC[key])return IMGC[key];
@@ -621,6 +652,9 @@ var ACT={
     if(S.delArm!=='__done'){S.delArm='__done';render(true);return}
     S.saved=S.saved.filter(function(x){return x.status!=='done'});S.delArm='';LS.set('sk_saved',S.saved);render(true);toast('ลบข่าวที่โพสต์แล้วเรียบร้อย');
   },
+  cimg2:function(id,btn){var p=S.post[id];if(!p||!p.head)return;clip(imgStoryPromptOf(p)).then(function(){
+    toast(p.person?'คัดลอกแล้ว แนบรูป '+p.person+' จากเว็บทางการ/แถลงข่าว ไปพร้อมคำสั่งด้วย':'คัดลอกแล้ว ไปวางใน Gemini/ChatGPT');
+  }).catch(function(){toast('คัดลอกไม่ได้')})},
   cimg:function(id,btn){var p=S.post[id];if(!p||!p.head)return;clip(imgPromptOf(p)).then(function(){btn.textContent='คัดลอกแล้ว ✓ ไปวางใน Gemini/ChatGPT';setTimeout(function(){btn.textContent='คัดลอกคำสั่งสร้างภาพ'},2500)}).catch(function(){toast('คัดลอกไม่ได้')})},
   cpost:function(id,btn){var p=S.post[id];if(!p)return;clip(postText(p)).then(function(){btn.textContent='คัดลอกแล้ว ✓';setTimeout(function(){btn.textContent='คัดลอกโพสต์'},1500)},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่ข้อความ')})},
   ask:function(id){var it=find(id);if(!it)return;S.ctx={id:id,title:it.title_th||it.title};S.chatErr='';go('chat')},
