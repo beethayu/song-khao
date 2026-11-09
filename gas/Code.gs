@@ -101,7 +101,8 @@ const API = {
   retell: retell,
   makePost: makePost,
   chat: chat,
-  getGroupRealEstate: getGroupRealEstate
+  getGroupRealEstate: getGroupRealEstate,
+  getPagePosts: getPagePosts
 };
 
 // ใช้ครั้งเดียวในหน้า Apps Script: ขอสิทธิ์ + สร้างชีต
@@ -563,6 +564,61 @@ function getGroupRealEstate(groupUrl) {
     const topResults = processed.slice(0, 10);
 
     return { ok: true, result: topResults };
+  } catch (e) {
+    return { ok: false, error: e.toString() };
+  }
+}
+
+// ==========================================
+// ดึงโพสต์ "ล่าสุด" จากเพจ Facebook (Apify) ไว้ดูหัวข้อ/ความเคลื่อนไหวเร็ว ๆ
+// ผู้ใช้กดเอง ไม่ดึงอัตโนมัติ (กินเครดิต Apify) · ไม่ตัดตามยอดไลก์ เพราะต้องการความไว
+// ต้องตั้ง APIFY_TOKEN ใน Script Properties
+// ==========================================
+function getPagePosts(pageUrl) {
+  const token = PropertiesService.getScriptProperties().getProperty('APIFY_TOKEN');
+  if (!token) return { ok: false, error: 'ยังไม่ได้ตั้งค่า APIFY_TOKEN' };
+  const url = String(pageUrl || '').trim();
+  if (!/^https?:\/\/(www\.|m\.|web\.)?facebook\.com\//i.test(url) || /facebook\.com\/groups\//i.test(url)) {
+    return { ok: false, error: 'ต้องเป็นลิงก์เพจ Facebook (ไม่ใช่กลุ่ม)' };
+  }
+  const since = new Date(Date.now() - 3 * 24 * 3600 * 1000);
+  const payload = {
+    startUrls: [{ url: url }],
+    resultsLimit: 12,
+    onlyPostsNewerThan: Utilities.formatDate(since, 'GMT', 'yyyy-MM-dd')
+  };
+  try {
+    const res = UrlFetchApp.fetch(
+      'https://api.apify.com/v2/acts/apify~facebook-posts-scraper/run-sync-get-dataset-items?token=' + token,
+      { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true });
+    const data = JSON.parse(res.getContentText());
+    if (!Array.isArray(data)) return { ok: false, error: 'Apify ตอบกลับผิดรูปแบบ' };
+    const seen = {};
+    const out = [];
+    data.forEach(function (post) {
+      const text = String(post.text || post.message || '').trim();
+      if (!text) return;
+      const key = text.substring(0, 50);
+      if (seen[key]) return;
+      seen[key] = true;
+      const likes = post.likes || post.reactionsCount || post.likesCount || 0;
+      const comments = post.comments || post.commentsCount || 0;
+      const shares = post.shares || post.sharesCount || 0;
+      const t = new Date(post.time || post.timestamp || Date.now()).getTime();
+      out.push({
+        id: String(post.postId || post.url || key),
+        title_th: text.substring(0, 90) + (text.length > 90 ? '...' : ''),
+        title: text.substring(0, 300),
+        source: 'Facebook Page',
+        url: post.url || url,
+        ts: isNaN(t) ? Date.now() : t,
+        tag: 'เพจ',
+        img: post.thumbnail || (post.media && post.media.length > 0 ? post.media[0].thumbnail : '') || '',
+        metric: '\u2764\uFE0F ' + likes + ' · \uD83D\uDCAC ' + comments + ' · \uD83D\uDD01 ' + shares
+      });
+    });
+    out.sort(function (a, b) { return b.ts - a.ts; });
+    return { ok: true, result: out.slice(0, 12) };
   } catch (e) {
     return { ok: false, error: e.toString() };
   }

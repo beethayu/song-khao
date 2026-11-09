@@ -118,7 +118,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='5 · 2026-11-09';
+var VERSION='5.1 · 2026-11-09';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -132,6 +132,8 @@ var S={
   news:LS.get('sk_news',{near:[],th:[],world:[],at:0}),
   re:LS.get('sk_re',[]), // เก็บข้อมูลอสังหาฯ
   reUrl:LS.get('sk_reUrl',''), // เก็บ URL กลุ่มล่าสุด
+  pg:LS.get('sk_pg',[]), // โพสต์ล่าสุดจากเพจ
+  pgUrl:LS.get('sk_pgUrl',''),pgLoading:false,
   saved:LS.get('sk_saved',[]),
   chat:LS.get('sk_chat',[]),
   ctx:null,tst:{t:'',c:''},busy:0,open:{},retelling:{},posting:{},post:LS.get('sk_post',{}),loading:false,sending:false,chatErr:'',wipeArm:false,reLoading:false
@@ -173,7 +175,7 @@ async function api(fn,args,ms){
 
 // ---------- ข้อมูล ----------
 function find(id){
-  var all=S.news.near.concat(S.news.th,S.news.world,S.saved,S.re);
+  var all=S.news.near.concat(S.news.th,S.news.world,S.saved,S.re,S.pg);
   for(var i=0;i<all.length;i++)if(all[i].id===id)return all[i];
   return null;
 }
@@ -195,6 +197,22 @@ async function loadNews(){
     LS.set('sk_saved',S.saved);
   }catch(e){toast('โหลดไม่ได้: '+e.message+' (แสดงข่าวที่เก็บไว้)')}
   S.loading=false;$('#rf').classList.remove('spin');render(true);
+}
+async function loadPage(){
+  var u=$('#pgUrl')?$('#pgUrl').value.trim():S.pgUrl;
+  if(!u){toast('ใส่ลิงก์เพจ Facebook ก่อน');return}
+  if(!/facebook\.com\//.test(u)||/facebook\.com\/groups\//.test(u)){toast('ต้องเป็นลิงก์เพจ Facebook (ไม่ใช่กลุ่ม)');return}
+  S.pgUrl=u;LS.set('sk_pgUrl',u);S.pgLoading=true;render(true);
+  try{
+    var res=await api('getPagePosts',[u],120000);
+    if(res&&res.ok){S.pg=res.result;LS.set('sk_pg',S.pg);toast(res.result.length?'ดึงโพสต์ล่าสุดแล้ว '+res.result.length+' โพสต์':'ไม่พบโพสต์ใน 3 วันล่าสุด')}
+    else toast('Error: '+((res&&res.error)||'ไม่ทราบสาเหตุ'));
+  }catch(e){toast('ดึงข้อมูลไม่ได้: '+e.message)}
+  S.pgLoading=false;render(true);
+}
+function pgHtml(){
+  return '<div class="card pad"><div class="h2">โพสต์ล่าสุดจากเพจ Facebook</div><div class="hint" style="margin-bottom:10px">วางลิงก์เพจที่อยากตามหัวข้อ ดึงโพสต์ใหม่ภายใน 3 วัน (กินเครดิต Apify ทุกครั้งที่กด) ใช้ดูหัวข้อ แล้วให้ลุงเขียนใหม่ด้วยคำของเรา</div><input id="pgUrl" value="'+esc(S.pgUrl)+'" placeholder="https://facebook.com/ชื่อเพจ" autocapitalize="off" autocorrect="off" style="font-size:16px;padding:10px;border:1px solid #ccc;border-radius:8px;width:100%"><div style="margin-top:10px"><button class="btn pri" data-act="fetchPg" style="width:100%">'+(S.pgLoading?'กำลังดึงโพสต์...':'ดึงโพสต์ล่าสุด')+'</button></div></div>'+
+    (S.pg.length?'<div class="hint" style="margin:0 4px 8px">โพสต์ล่าสุดจากเพจ (ใหม่สุดอยู่บน)</div>'+S.pg.map(function(it,i){return itemHtml(it,i,false)}).join(''):'');
 }
 async function loadRealEstate(){
   var urlInput = $('#reUrl') ? $('#reUrl').value.trim() : S.reUrl;
@@ -231,7 +249,7 @@ function itemHtml(it,i,hot){
     else if(S.post[it.id]){var p=S.post[it.id];b+='<div class="lh">โพสต์ที่ลุงร่างให้</div><div class="lung">'+esc(postText(p))+'</div><img class="pimg" src="'+postImg(p)+'" alt="การ์ดภาพ"><div class="note">กดค้างที่ภาพเพื่อบันทึก</div>'}
     b+='<div class="note">ที่มา: '+esc(it.source||'-')+link+'</div><div class="acts">';
     
-    if(it.tag === 'อสังหาฯ') {
+    if(it.tag === 'อสังหาฯ' || it.tag === 'เพจ') {
       b+='<a class="btn pri" href="'+esc(it.url)+'" target="_blank" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">🔗 เปิดใน Facebook</a>';
     } else {
       if(!it.lung&&!S.retelling[it.id])b+='<button class="btn acc" data-act="retell" data-id="'+esc(it.id)+'">ให้ลุงเล่า</button>';
@@ -321,7 +339,7 @@ function render(keep){
   else if(S.tab==='set')h=setHtml();
   else if(S.tab==='saved')h=listHtml(S.saved,'saved');
   else if(S.tab==='re')h=listHtml(S.re,'re');
-  else h=listHtml(S.news[S.tab],S.tab);
+  else h=(S.tab==='near'?pgHtml():'')+listHtml(S.news[S.tab],S.tab);
   p.innerHTML=h;
   if(S.tab==='chat'){p.scrollTop=p.scrollHeight}
   else p.scrollTop=keep?top:0;
@@ -484,6 +502,7 @@ var ACT={
     LS.set('sk_saved',S.saved);
   },
   fetchRe:function(){ loadRealEstate(); },
+  fetchPg:function(){ loadPage(); },
   size:function(){
     var total = 0;
     for(var k in localStorage){
@@ -516,8 +535,8 @@ var ACT={
   },
   wipe:function(){
     if(!S.wipeArm){S.wipeArm=true;render(true);return}
-    ['sk_news','sk_saved','sk_chat','sk_tab','sk_re','sk_reUrl'].forEach(function(k){try{localStorage.removeItem(k)}catch(e){}});
-    S.news={near:[],th:[],world:[],at:0};S.saved=[];S.chat=[];S.re=[];S.ctx=null;S.wipeArm=false;render();toast('ล้างแล้ว (รหัส API ยังอยู่)');
+    ['sk_news','sk_saved','sk_chat','sk_tab','sk_re','sk_reUrl','sk_pg'].forEach(function(k){try{localStorage.removeItem(k)}catch(e){}});
+    S.news={near:[],th:[],world:[],at:0};S.saved=[];S.chat=[];S.re=[];S.pg=[];S.ctx=null;S.wipeArm=false;render();toast('ล้างแล้ว (รหัส API ยังอยู่)');
   }
 };
 function saveCfg(){
@@ -533,6 +552,7 @@ $('#page').addEventListener('click',function(e){
 });
 $('#page').addEventListener('change',function(e){
   if(e.target.id==='cu'||e.target.id==='ck') saveCfg();
+  if(e.target.id==='pgUrl'){ S.pgUrl=e.target.value; LS.set('sk_pgUrl',S.pgUrl); }
   if(e.target.id==='reUrl') { S.reUrl = e.target.value; LS.set('sk_reUrl', S.reUrl); }
   var act = e.target.getAttribute('data-act');
   if(act==='status' || act==='note'){
