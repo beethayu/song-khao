@@ -83,7 +83,7 @@ def trends(geo, region, label):
     return out
 
 
-def gnews(query, region, hl, gl, ceid, label, limit=25):
+def gnews(query, region, hl, gl, ceid, label, limit=25, tag=None):
     """Google News RSS ค้นหา (ไม่มีตัวเลขปฏิสัมพันธ์ ใช้ลำดับแทน)"""
     q = urllib.parse.quote(query)
     root = ET.fromstring(get(f"https://news.google.com/rss/search?q={q}&hl={hl}&gl={gl}&ceid={ceid}"))
@@ -96,7 +96,7 @@ def gnews(query, region, hl, gl, ceid, label, limit=25):
         out.append(dict(
             id=mid(region, title), region=region, title=title, source=src,
             url=(it.findtext("link") or "").strip(), raw=max(50 - i, 1), metric=label,
-            snippet="", tag=query.split(" ")[0],
+            snippet="", tag=tag or query.split(" ")[0],
         ))
         if i >= limit - 1:
             break
@@ -153,18 +153,27 @@ SOURCES = [
 ]
 
 
-# แท็บ "ใกล้ตัว": เตือนภัย/สิทธิ/มิจฉาชีพ ค้นจาก Google News RSS (ใช้ได้อยู่แล้ว) แหล่งละ 10 ข่าว
+# ข่าวหมวด (region "near") ค้นจาก Google News RSS · tag = รหัสหมวด (alert/welfare/econ/protest/ent) แหล่งละ 8 ข่าว
 NEAR_Q = [
-    ("เตือนภัย มิจฉาชีพ when:2d", "เตือนภัยมิจฉาชีพ"),
-    ("ตำรวจไซเบอร์ เตือน when:3d", "ตำรวจไซเบอร์เตือน"),
-    ("สคบ. เตือน when:3d", "สคบ.เตือน"),
-    ("ปภ. เตือน when:1d", "ปภ.เตือน"),
-    ("กรมอุตุนิยมวิทยา เตือน ฝนตกหนัก when:1d", "เตือนสภาพอากาศ"),
-    ("สิทธิ ประชาชน ต้องรู้ when:2d", "สิทธิที่ต้องรู้"),
-    ("สปสช. สิทธิ บัตรทอง when:3d", "สิทธิสุขภาพ"),
+    ("alert", "เตือนภัย มิจฉาชีพ when:2d", "เตือนภัยมิจฉาชีพ"),
+    ("alert", "ตำรวจไซเบอร์ เตือน when:3d", "ตำรวจไซเบอร์เตือน"),
+    ("alert", "สคบ. เตือน when:3d", "สคบ.เตือน"),
+    ("alert", "ปภ. เตือน when:1d", "ปภ.เตือน"),
+    ("alert", "กรมอุตุนิยมวิทยา เตือน ฝนตกหนัก when:1d", "เตือนสภาพอากาศ"),
+    ("welfare", "บัตรสวัสดิการแห่งรัฐ when:3d", "บัตรสวัสดิการ"),
+    ("welfare", "เงินช่วยเหลือ ลงทะเบียน when:3d", "เงินช่วยเหลือ"),
+    ("welfare", "สปสช. สิทธิ บัตรทอง when:3d", "สิทธิสุขภาพ"),
+    ("econ", "ค่าครองชีพ when:2d", "ค่าครองชีพ"),
+    ("econ", "ราคาน้ำมัน ปรับ when:1d", "ราคาน้ำมัน"),
+    ("econ", "ค่าไฟ งวดใหม่ when:3d", "ค่าไฟ"),
+    ("protest", "ชุมนุม ประท้วง when:2d", "ชุมนุม"),
+    ("protest", "ม็อบ when:2d", "ม็อบ"),
+    ("protest", "สนธิ ลิ้มทองกุล when:3d", "สนธิ"),
+    ("ent", "ดราม่า ดารา when:1d", "ดราม่าบันเทิง"),
+    ("ent", "ข่าวบันเทิง when:1d", "ข่าวบันเทิง"),
 ]
-SOURCES += [("gnews-near-" + str(i), (lambda q=q, l=l: gnews(q, "near", "th", "TH", "TH:th", l, 10)))
-            for i, (q, l) in enumerate(NEAR_Q)]
+SOURCES += [("gnews-near-" + c + "-" + str(i), (lambda q=q, l=l, c=c: gnews(q, "near", "th", "TH", "TH:th", l, 8, c)))
+            for i, (c, q, l) in enumerate(NEAR_Q)]
 
 
 RSS_TH = [
@@ -191,7 +200,7 @@ def collect():
     for name, fn in SOURCES:
         try:
             got = [x for x in fn() if x["title"] and re.search(r"[A-Za-zก-๙]", x["title"])
-                   and not SKIP.search(x["title"] + " " + x["tag"])]
+                   and (x["tag"] == "ent" or not SKIP.search(x["title"] + " " + x["tag"]))]
         except Exception as e:  # ข้ามแหล่งที่พัง ไม่ล้มทั้งงาน
             print(f"{name}: ล้มเหลว ({type(e).__name__})")
             continue
@@ -361,7 +370,7 @@ def main():
         print(f"แปล รอบ {i + 1}:", r)
         if r.get("left", 0) == 0 or r.get("done", 0) == 0:
             break
-    for i in range(4):  # ให้คะแนนความดราม่าทีละ 25 หัวข้อ (พลาดไม่ล้มทั้งงาน)
+    for i in range(6):  # ให้คะแนนทีละ 25 หัวข้อ (พลาดไม่ล้มทั้งงาน)
         try:
             r = call("scorePending", [25])
         except Exception as e:

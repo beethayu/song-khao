@@ -49,16 +49,26 @@ const SCORE_PROMPT = [
   'ตอบเป็น JSON array ของ object {"d":number,"sides":string,"mood":string} จำนวนและลำดับตรงกับหัวข้อที่ให้'
 ].join('\n');
 
-// แท็บ "ใกล้ตัว" (region = near): เรื่องที่กระทบเงิน/ความปลอดภัยของชาวบ้าน ใช้คอลัมน์ drama เก็บคะแนน "ความใกล้ตัว"
+// ข่าวหมวด (region = near) แยกหมวดด้วยคอลัมน์ tag: alert เตือนภัย · welfare สวัสดิการ/สิทธิ · econ เศรษฐกิจ · protest ชุมนุม/การเมือง · ent บันเทิง
+// คะแนนเก็บในคอลัมน์ drama = "คนทั่วไปน่าสนใจแค่ไหนในหมวดนั้น"
+const NEAR_CATS = { alert: 'เตือนภัย', welfare: 'สวัสดิการ/สิทธิ', econ: 'เศรษฐกิจ', protest: 'ชุมนุม/ประท้วง', ent: 'บันเทิง' };
+function nearCat_(o) {
+  const t = String(o.tag || '');
+  if (NEAR_CATS[t]) return t;
+  if (/สิทธิ|สปสช/.test(t)) return 'welfare'; // ข่าวรอบแรกก่อนแยกหมวด
+  return 'alert';
+}
 const NEAR_SCORE_PROMPT = [
-  'คุณเป็นบรรณาธิการเพจข่าวเตือนภัยและสิทธิประชาชน ให้คะแนนหัวข้อข่าวแต่ละข้อว่า "ใกล้ตัวชาวบ้าน" แค่ไหน',
+  'คุณเป็นบรรณาธิการเพจเล่าข่าวสำหรับชาวบ้านทั่วไป หัวข้อแต่ละข้อมี [หมวด] นำหน้า ให้คะแนนว่าคนไทยทั่วไปน่าสนใจ/ควรรู้แค่ไหน "ในหมวดนั้น"',
   'd = คะแนน 0-10',
-  '  สูง 7-10: เตือนภัยมิจฉาชีพ/ฉ้อโกง, ภัยธรรมชาติหรือสภาพอากาศรุนแรงที่ระบุช่วงเวลา/พื้นที่, สิทธิ/สวัสดิการ/กฎหมายที่กระทบชาวบ้านโดยตรง (บัตรสวัสดิการ ค่ารักษา ค่าเช่า ใบขับขี่ ประกัน ภาษี), สินค้า/อาหารอันตรายและการคุ้มครองผู้บริโภค, วิธีรับมือหรือเบอร์โทรด่วน',
-  '  กลาง 4-6: นโยบายหรือมาตรการที่ยังไม่ชัดว่ากระทบชาวบ้านอย่างไร',
-  '  ต่ำ 0-2: การเมืองล้วน ดราม่าตัวบุคคล ข่าวธุรกิจ/ตัวเลขล้วน ข่าวต่างประเทศที่ไม่เกี่ยวกับคนไทย บันเทิง กีฬา',
-  '  เรื่องสถาบันพระมหากษัตริย์ ให้ d = 0',
-  'sides = สตริงว่างเสมอ',
-  'mood = "serious" (มีผู้เสียชีวิต/บาดเจ็บ ภัยพิบัติ เหยื่อ เด็ก) | "neutral" (นอกนั้น)',
+  '  [เตือนภัย] สูง: มิจฉาชีพ/ฉ้อโกงรูปแบบใหม่ ภัยธรรมชาติหรืออากาศรุนแรงที่ระบุเวลา/พื้นที่ สินค้า/อาหารอันตราย วิธีรับมือ เบอร์โทรด่วน',
+  '  [สวัสดิการ/สิทธิ] สูง: บัตรสวัสดิการ เงินช่วยเหลือ วันลงทะเบียน/วันเงินเข้า สิทธิรักษา กฎหมายใหม่ที่กระทบชาวบ้าน',
+  '  [เศรษฐกิจ] สูง: ค่าครองชีพ ราคาน้ำมัน ค่าไฟ ค่าแรง หนี้ครัวเรือน ที่กระทบกระเป๋าเงินชาวบ้าน · ต่ำ: ข่าวหุ้น/ธุรกิจเฉพาะทาง',
+  '  [ชุมนุม/ประท้วง] สูง: การชุมนุมที่มีวัน เวลา สถานที่ ผลกระทบการจราจร ข้อเรียกร้องหลัก ความคืบหน้าสำคัญ · ต่ำ: ข่าวซ้ำ ไม่มีความคืบหน้า',
+  '  [บันเทิง] สูง: ดราม่าคนดังที่คนถกเถียงกันมาก · ต่ำ: โปรโมตผลงาน ข่าวประชาสัมพันธ์',
+  '  ต่ำ 0-2 ทุกหมวด: ไม่ตรงหมวด ตัวเลขล้วน (เลขสลาก) โฆษณา · เรื่องสถาบันพระมหากษัตริย์ ให้ d = 0',
+  'sides = ถ้าเป็น [บันเทิง] ที่มีดราม่าให้เลือกข้าง ใส่ "ฝั่ง A / ฝั่ง B" ไม่เกิน 12 คำ นอกนั้นเป็นสตริงว่าง',
+  'mood = "serious" (มีผู้เสียชีวิต/บาดเจ็บ ภัยพิบัติ เหยื่อ เด็ก) | "jig" (เฉพาะ [บันเทิง] ที่จิกขำ ๆ ได้) | "neutral" (นอกนั้น รวมถึง [ชุมนุม/ประท้วง] ทุกข่าว)',
   'ตอบเป็น JSON array ของ object {"d":number,"sides":string,"mood":string} จำนวนและลำดับตรงกับหัวข้อที่ให้'
 ].join('\n');
 
@@ -268,7 +278,9 @@ function scorePending(limit) {
 
 function scoreBatch_(sh, batch, sysPrompt, isNear) {
   if (!batch.length) return 0;
-  const prompt = JSON.stringify(batch.map(function (o) { return o.title_th || o.title; }));
+  const prompt = JSON.stringify(batch.map(function (o) {
+    return (isNear ? '[' + NEAR_CATS[nearCat_(o)] + '] ' : '') + (o.title_th || o.title);
+  }));
   const arr = JSON.parse(gemini_(sysPrompt, [{ role: 'user', parts: [{ text: prompt }] }], 0.2, true));
   if (!Array.isArray(arr) || arr.length !== batch.length) throw new Error('ให้คะแนนไม่ครบ ลองใหม่');
   let done = 0;
@@ -276,9 +288,11 @@ function scoreBatch_(sh, batch, sysPrompt, isNear) {
     const r = arr[i] || {};
     const d = Math.max(0, Math.min(10, Math.round(Number(r.d))));
     if (isNaN(d)) return;
-    const moods = isNear ? ['neutral', 'serious'] : ['jig', 'neutral', 'serious'];
-    const mood = moods.indexOf(r.mood) >= 0 ? r.mood : 'neutral';
-    const sides = isNear ? '' : String(r.sides || '').slice(0, 80);
+    let mood = ['jig', 'neutral', 'serious'].indexOf(r.mood) >= 0 ? r.mood : 'neutral';
+    const cat = isNear ? nearCat_(o) : '';
+    if (isNear && cat !== 'ent' && mood === 'jig') mood = 'neutral'; // จิกได้เฉพาะบันเทิง
+    if (cat === 'protest' && mood !== 'serious') mood = 'neutral'; // การเมืองเล่ากลาง ๆ เสมอ
+    const sides = (!isNear || cat === 'ent') ? String(r.sides || '').slice(0, 80) : '';
     sh.getRange(o._row, 13, 1, 3).setValues([[d, sides, mood]]);
     if (o.lung) sh.getRange(o._row, 10).setValue(''); // ล้างสำนวนเก่า ให้ลุงเล่าใหม่ตามสไตล์ใหม่
     done++;
@@ -378,7 +392,14 @@ function newsInfo_(o) {
 function retellText_(o) {
   const mood = o.mood || 'jig';
   let how;
-  if (o.region === 'near') {
+  const cat = o.region === 'near' ? nearCat_(o) : '';
+  if (cat === 'econ') {
+    how = 'ข่าวเศรษฐกิจปากท้อง เล่าตรง ๆ 3–5 ประโยค ว่าเรื่องนี้กระทบกระเป๋าเงินชาวบ้านยังไง ใช้ตัวเลขเฉพาะที่มีในข้อมูล ห้ามเดาตัวเลข ' +
+      'แซวสถานการณ์ได้เบา ๆ แต่ไม่จิกตัวบุคคล ปิดท้ายถามว่าหลานรู้สึกผลกระทบไหม';
+  } else if (cat === 'protest') {
+    how = 'ข่าวการชุมนุม/การเมือง เล่าเป็นกลางเคร่งครัด 3–5 ประโยค: ใคร ชุมนุมที่ไหน เมื่อไหร่ เรียกร้องอะไร กระทบการเดินทางไหม ตามข้อมูลที่มีเท่านั้น ' +
+      'ห้ามเข้าข้าง ห้ามจิกฝ่ายใด ห้ามเดาจำนวนคน ปิดท้ายด้วยคำแนะนำให้เลี่ยงเส้นทาง (ถ้ามีข้อมูล) หรือถามความเห็นแบบเปิด';
+  } else if (cat === 'alert' || cat === 'welfare') {
     how = 'ข่าวนี้เป็นข่าวเตือน/สิทธิที่ใกล้ตัวชาวบ้าน เล่าตรง ๆ กระชับ 3–5 ประโยค ไม่เล่นมุก ไม่ขู่เกินจริง: เปิดด้วยคำเตือนสั้น ๆ ' +
       'บอกว่าเรื่องนี้กระทบใคร และควรทำอะไร ใส่ตัวเลข วันที่ เบอร์โทร เฉพาะที่มีอยู่ในข้อมูลเท่านั้น ' +
       'ถ้าข้อมูลมีแค่หัวข้อ ให้บอกตรง ๆ ว่ารู้แค่นี้ ให้ตรวจกับหน่วยงานทางการหรือต้นฉบับอีกที ปิดท้ายชวนให้ส่งต่อเตือนคนที่บ้าน';
@@ -399,8 +420,9 @@ function retellText_(o) {
 function makePost(id) {
   const o = rows_(sheet_()).filter(function (x) { return x.id === id; })[0];
   if (!o) throw new Error('ไม่พบข่าวนี้ (อาจถูกลบแล้ว)');
-  if (o.region === 'near') return makeNearPost_(o);
-  const mood = o.mood || 'jig';
+  const cat = o.region === 'near' ? nearCat_(o) : '';
+  if (cat === 'alert' || cat === 'welfare' || cat === 'econ') return makeNearPost_(o);
+  const mood = cat === 'protest' ? 'neutral' : (o.mood || 'jig');
   const tone = mood === 'serious' ? 'ข่าวอ่อนไหว: น้ำเสียงสุภาพเห็นใจ ห้ามมุกหรือจิกกัด ไม่ต้องมีคำถามเลือกข้าง (q ให้เป็นประโยคชวนแสดงความรู้สึก/ห่วงใย)'
     : mood === 'neutral' ? 'ข่าวอ่อนไหว: เป็นกลาง ไม่เข้าข้าง q ให้เป็นคำถามเปิดไม่ชี้นำ'
     : 'จิก ๆ ขำ ๆ แบบลุง จิกที่สถานการณ์/ระบบ/พฤติกรรม ไม่จิกตัวบุคคล q ให้เป็นคำถามให้คนเลือกข้างในคอมเมนต์' + (o.sides ? ' (ฝั่ง: ' + o.sides + ')' : '');
@@ -419,7 +441,7 @@ function makePost(id) {
 function makeNearPost_(o) {
   const tone = o.mood === 'serious' ? 'มีผู้ได้รับผลกระทบรุนแรง: น้ำเสียงสุภาพ ห่วงใย ห้ามมุก' : 'น้ำเสียงตรง กระชับ เตือนด้วยความห่วงใย ไม่ขู่เกินจริง';
   const prompt = 'ทำโพสต์เตือนภัย/สิทธิใกล้ตัวสำหรับ Facebook จากข่าวนี้ ตอบเป็น JSON เท่านั้น รูปแบบ {"hook":"","pts":["","",""],"q":"","tags":["","","","",""]}\n' +
-    '- hook: พาดหัวคำเตือน ขึ้นต้นด้วยคำอย่าง "เตือน!" "ต้องรู้!!" "เตรียมรับมือ!" ไม่เกิน 40 ตัวอักษร (ใช้บนการ์ดภาพ)\n' +
+    '- hook: พาดหัวสั้น ' + ({ alert: 'ขึ้นต้นด้วย "เตือน!" หรือ "เตรียมรับมือ!"', welfare: 'ขึ้นต้นด้วย "ต้องรู้!!" หรือ "เตรียมเฮ!!" (เฮเฉพาะข่าวได้ประโยชน์)', econ: 'ขึ้นต้นด้วย "ต้องรู้!!" หรือ "กระเป๋าสะเทือน!"' }[nearCat_(o)] || 'ขึ้นต้นด้วย "ต้องรู้!!"') + ' ไม่เกิน 40 ตัวอักษร (ใช้บนการ์ดภาพ)\n' +
     '- pts: สรุป 3 ข้อสั้นมาก ข้อละไม่เกิน 45 ตัวอักษร เอาไปใช้ได้ทันที ใส่ตัวเลข วันที่ เบอร์โทร เฉพาะที่มีในข้อมูลด้านล่างเท่านั้น ห้ามแต่งหรือเดา\n' +
     '- q: ประโยคชวนส่งต่อเตือนคนใกล้ตัว 1 ประโยค\n- tags: แฮชแท็กไทย 5 อัน ขึ้นต้นด้วย # ไม่มีเว้นวรรค\n' +
     tone + '\n\n' + newsInfo_(o);
@@ -609,7 +631,7 @@ function getPagePosts(pageUrl) {
         id: String(post.postId || post.url || key),
         title_th: text.substring(0, 90) + (text.length > 90 ? '...' : ''),
         title: text.substring(0, 300),
-        source: 'Facebook Page',
+        source: 'เพจ ' + pageName_(post, url),
         url: post.url || url,
         ts: isNaN(t) ? Date.now() : t,
         tag: 'เพจ',
@@ -622,4 +644,11 @@ function getPagePosts(pageUrl) {
   } catch (e) {
     return { ok: false, error: e.toString() };
   }
+}
+
+function pageName_(post, url) {
+  const n = post.pageName || (post.user && post.user.name) || post.authorName || '';
+  if (n) return String(n).slice(0, 60);
+  const m = String(url).match(/facebook\.com\/(?:profile\.php\?id=)?([^/?#]+)/i);
+  return m ? decodeURIComponent(m[1]) : 'Facebook';
 }

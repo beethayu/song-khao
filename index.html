@@ -89,11 +89,16 @@ body[data-tab=chat] #comp{display:flex}
 #msg{flex:1;min-width:0;resize:none;border:0;outline:0;background:var(--bg);border-radius:18px;padding:9px 14px;font-size:16px;line-height:1.4;max-height:110px}
 #snd{flex:none;height:40px;padding:0 18px;border-radius:20px;background:var(--acc);color:#fff;font-weight:700}
 #snd:disabled{opacity:.5}
+.cats{position:sticky;top:0;z-index:5;background:var(--bg);margin:-12px -12px 10px;padding:10px 12px 8px;display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.cats::-webkit-scrollbar{display:none}
+.cat{flex:none;height:34px;padding:0 14px;border-radius:17px;background:#fff;color:var(--pri);font-weight:600;font-size:14px;white-space:nowrap}
+.cat.on{background:var(--pri);color:#fff}
+.cat i{font-style:normal;opacity:.65;font-size:12px;margin-left:4px}
 #toast{position:fixed;left:16px;right:16px;bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 12px);background:rgba(27,42,51,.94);color:#fff;font-size:13px;padding:10px 14px;border-radius:12px;z-index:40;display:none;text-align:center}
 body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 70px)}
 </style>
 </head>
-<body data-tab="near">
+<body data-tab="news">
 <div id="sbar"></div>
 <div id="app">
   <header>
@@ -102,9 +107,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
   </header>
   <div id="page"></div>
   <nav>
-    <button data-tab="near"><svg viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>ใกล้ตัว</button>
-    <button data-tab="th"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>ไทย</button>
-    <button data-tab="world"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>โลก</button>
+    <button data-tab="news"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h10M7 17h6"/></svg>ข่าว</button>
     <!-- แท็บอสังหาฯ พักไว้ก่อน (โค้ด tab "re" ยังอยู่ครบ เปิดกลับโดยเอา comment ออก)
     <button data-tab="re"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>อสังหาฯ</button>
     -->
@@ -118,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='5.1 · 2026-11-09';
+var VERSION='6 · 2026-11-09';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -126,9 +129,10 @@ var LS={
   get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
   set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 };
-var TABS={near:'ข่าวใกล้ตัว',th:'ข่าวไทย',world:'ข่าวโลก',re:'อสังหาฯ (กลุ่ม)',saved:'เก็บไว้',chat:'แชท',set:'ตั้งค่า'};
+var TABS={news:'ข่าว',re:'อสังหาฯ (กลุ่ม)',saved:'เก็บไว้',chat:'แชท',set:'ตั้งค่า'};
 var S={
-  tab:LS.get('sk_tab','near'),
+  tab:LS.get('sk_tab','news'),
+  cat:LS.get('sk_cat','th'),
   news:LS.get('sk_news',{near:[],th:[],world:[],at:0}),
   re:LS.get('sk_re',[]), // เก็บข้อมูลอสังหาฯ
   reUrl:LS.get('sk_reUrl',''), // เก็บ URL กลุ่มล่าสุด
@@ -138,9 +142,20 @@ var S={
   chat:LS.get('sk_chat',[]),
   ctx:null,tst:{t:'',c:''},busy:0,open:{},retelling:{},posting:{},post:LS.get('sk_post',{}),loading:false,sending:false,chatErr:'',wipeArm:false,reLoading:false
 };
-if(!TABS[S.tab]||S.tab==='chat'||S.tab==='re')S.tab='near';
+// หมวดในแท็บข่าว (เลื่อนซ้ายขวาได้)
+var CATS=[['th','ดราม่าไทย'],['alert','เตือนภัย'],['welfare','สวัสดิการ'],['econ','เศรษฐกิจ'],['protest','ชุมนุม'],['ent','บันเทิง'],['world','ต่างประเทศ'],['page','จากเพจ']];
+var CATL={};CATS.forEach(function(c){CATL[c[0]]=c[1]});
+var NEAR_C={alert:1,welfare:1,econ:1,protest:1,ent:1};
+if(S.tab==='th'||S.tab==='world'||S.tab==='near'){S.cat=S.tab==='near'?'alert':S.tab;S.tab='news'}
+if(!TABS[S.tab]||S.tab==='chat'||S.tab==='re')S.tab='news';
+if(!CATL[S.cat])S.cat='th';
 if(!S.news.near)S.news.near=[];
-function isNews(t){return t==='near'||t==='th'||t==='world'}
+function catOf(it){var t=String(it.tag||'');if(NEAR_C[t])return t;if(/สิทธิ|สปสช/.test(t))return 'welfare';return 'alert'}
+function catList(c){
+  if(c==='th'||c==='world')return S.news[c]||[];
+  if(c==='page')return S.pg;
+  return S.news.near.filter(function(x){return catOf(x)===c});
+}
 
 function cfg(){var c=LS.get('sk_cfg',{});return {url:c.url||DEFAULT_URL,key:c.key||''}}
 function ago(ts){
@@ -190,7 +205,7 @@ async function loadNews(){
   if(!c.url||!c.key){render(true);return}
   S.loading=true;$('#rf').classList.add('spin');
   try{
-    var r=await Promise.all([api('list',['th',40]),api('list',['world',40]),api('list',['near',40]).catch(function(){return S.news.near})]);
+    var r=await Promise.all([api('list',['th',40]),api('list',['world',40]),api('list',['near',80]).catch(function(){return S.news.near})]);
     S.news={th:r[0],world:r[1],near:r[2],at:Date.now()};
     LS.set('sk_news',S.news);
     S.saved.forEach(function(s){var f=find(s.id);if(f&&f!==s&&f.lung)s.lung=f.lung});
@@ -212,7 +227,7 @@ async function loadPage(){
 }
 function pgHtml(){
   return '<div class="card pad"><div class="h2">โพสต์ล่าสุดจากเพจ Facebook</div><div class="hint" style="margin-bottom:10px">วางลิงก์เพจที่อยากตามหัวข้อ ดึงโพสต์ใหม่ภายใน 3 วัน (กินเครดิต Apify ทุกครั้งที่กด) ใช้ดูหัวข้อ แล้วให้ลุงเขียนใหม่ด้วยคำของเรา</div><input id="pgUrl" value="'+esc(S.pgUrl)+'" placeholder="https://facebook.com/ชื่อเพจ" autocapitalize="off" autocorrect="off" style="font-size:16px;padding:10px;border:1px solid #ccc;border-radius:8px;width:100%"><div style="margin-top:10px"><button class="btn pri" data-act="fetchPg" style="width:100%">'+(S.pgLoading?'กำลังดึงโพสต์...':'ดึงโพสต์ล่าสุด')+'</button></div></div>'+
-    (S.pg.length?'<div class="hint" style="margin:0 4px 8px">โพสต์ล่าสุดจากเพจ (ใหม่สุดอยู่บน)</div>'+S.pg.map(function(it,i){return itemHtml(it,i,false)}).join(''):'');
+    (S.pg.length?'<div class="hint" style="margin:0 4px 8px">โพสต์ล่าสุดจาก'+esc(S.pg[0].source||'เพจ')+' (ใหม่สุดอยู่บน)</div>'+S.pg.map(function(it,i){return itemHtml(it,i,false)}).join(''):'');
 }
 async function loadRealEstate(){
   var urlInput = $('#reUrl') ? $('#reUrl').value.trim() : S.reUrl;
@@ -270,7 +285,7 @@ function itemHtml(it,i,hot){
   
   var imgHtml = it.img ? '<img src="'+esc(it.img)+'" style="width:100%;height:180px;object-fit:cover;border-radius:8px;margin-top:10px;">' : '';
   
-  return '<div class="n"><button class="nh" data-act="tog" data-id="'+esc(it.id)+'"><span class="rk'+(hot?' hot':'')+'">'+(i+1)+'</span><span class="nt"><div class="lab">'+esc(it.metric||it.tag||'')+(it.drama!=null?(it.region==='near'?' · ใกล้ตัว ':' · ดราม่า ')+it.drama+'/10':'')+'</div><div class="ttl">'+esc(it.title_th||it.title)+'</div>'+(it.title_th&&!it.img?'<div class="orig">'+esc(it.title)+'</div>':'')+(it.sides?'<div class="sd">เลือกข้าง: '+esc(it.sides)+'</div>':'')+'<div class="sub">'+esc(it.source||'')+(it.ts?' · อัปเดต '+ago(it.ts):'')+'</div></span></button>'+(op?imgHtml:'')+b+'</div>';
+  return '<div class="n"><button class="nh" data-act="tog" data-id="'+esc(it.id)+'"><span class="rk'+(hot?' hot':'')+'">'+(i+1)+'</span><span class="nt"><div class="lab">'+esc(it.metric||it.tag||'')+(it.drama!=null?(it.region==='near'?' · น่าสนใจ ':' · ดราม่า ')+it.drama+'/10':'')+'</div><div class="ttl">'+esc(it.title_th||it.title)+'</div>'+(it.title_th&&!it.img?'<div class="orig">'+esc(it.title)+'</div>':'')+(it.sides?'<div class="sd">เลือกข้าง: '+esc(it.sides)+'</div>':'')+'<div class="sub">'+esc(it.source||'')+(it.ts?' · อัปเดต '+ago(it.ts):'')+'</div></span></button>'+(op?imgHtml:'')+b+'</div>';
 }
 function listHtml(list,mode){
   var c=cfg();
@@ -283,7 +298,7 @@ function listHtml(list,mode){
 
   if(!list.length){
     if(mode==='saved')return '<div class="card empty"><div class="h2">ยังไม่มีข่าวที่เก็บไว้</div><div class="hint">กดเปิดข่าว แล้วกด "เก็บไว้" เพื่อเก็บเป็นวัตถุดิบทำคอนเทนต์</div></div>';
-    if(mode==='near')return '<div class="card empty"><div class="h2">ยังไม่มีข่าวใกล้ตัว</div><div class="hint">ตัวดึงข่าวทำงานทุก 2 ชั่วโมง ข่าวเตือนภัย/สิทธิจะขึ้นหลังรอบถัดไป กดรีเฟรชด้านบนเพื่อโหลดใหม่</div></div>';
+    if(NEAR_C[mode])return '<div class="card empty"><div class="h2">ยังไม่มีข่าวหมวด'+esc(CATL[mode])+'</div><div class="hint">ตัวดึงข่าวทำงานทุก 2 ชั่วโมง ข่าวหมวดนี้จะขึ้นหลังรอบถัดไป กดรีเฟรชด้านบนเพื่อโหลดใหม่</div></div>';
     return '<div class="card empty"><div class="h2">ยังไม่มีข่าว</div><div class="hint">ตัวดึงข่าวทำงานทุก 2 ชั่วโมง กดปุ่มรีเฟรชด้านบนเพื่อโหลดใหม่</div></div>';
   }
   
@@ -327,19 +342,25 @@ function setHtml(){
   '<div class="card pad"><div class="h2">ข้อมูลในเครื่อง</div><div class="hint" style="margin-bottom:10px">ข่าวที่เก็บไว้ '+S.saved.length+' · ข้อความแชท '+S.chat.length+'</div><button class="btn" data-act="wipe">'+(S.wipeArm?'แตะอีกครั้งเพื่อยืนยันล้าง':'ล้างข้อมูลในเครื่อง')+'</button></div>'+
   '<div class="note" style="text-align:center">ส่งข่าว · เวอร์ชัน '+VERSION+'</div>';
 }
+function catsHtml(){
+  return '<div class="cats">'+CATS.map(function(c){
+    var n=c[0]==='page'?S.pg.length:catList(c[0]).length;
+    return '<button class="cat'+(S.cat===c[0]?' on':'')+'" data-act="cat" data-id="'+c[0]+'">'+esc(c[1])+(n?'<i>'+n+'</i>':'')+'</button>';
+  }).join('')+'</div>';
+}
 function render(keep){
   var p=$('#page'),top=p.scrollTop;
   document.body.setAttribute('data-tab',S.tab);
   Array.prototype.forEach.call(document.querySelectorAll('nav button'),function(b){b.classList.toggle('on',b.getAttribute('data-tab')===S.tab)});
-  $('#ttl').textContent=TABS[S.tab];
-  var n=isNews(S.tab)?S.news[S.tab].length:0;
-  $('#sub').textContent=isNews(S.tab)?(S.news.at?'อัปเดต '+hhmm(S.news.at)+' · '+n+' ข่าว':'ยังไม่เคยโหลด'):S.tab==='saved'?S.saved.length+' ข่าว':'';
+  $('#ttl').textContent=S.tab==='news'?'ข่าว · '+CATL[S.cat]:TABS[S.tab];
+  var n=S.tab==='news'?catList(S.cat).length:0;
+  $('#sub').textContent=S.tab==='news'?(S.news.at?'อัปเดต '+hhmm(S.news.at)+' · '+n+' ข่าว':'ยังไม่เคยโหลด'):S.tab==='saved'?S.saved.length+' ข่าว':'';
   var h;
   if(S.tab==='chat')h=chatHtml();
   else if(S.tab==='set')h=setHtml();
   else if(S.tab==='saved')h=listHtml(S.saved,'saved');
   else if(S.tab==='re')h=listHtml(S.re,'re');
-  else h=(S.tab==='near'?pgHtml():'')+listHtml(S.news[S.tab],S.tab);
+  else h=catsHtml()+(S.cat==='page'?pgHtml():listHtml(catList(S.cat),S.cat));
   p.innerHTML=h;
   if(S.tab==='chat'){p.scrollTop=p.scrollHeight}
   else p.scrollTop=keep?top:0;
@@ -427,7 +448,7 @@ async function doPost(id){
   }catch(e){
     var it=find(id);
     if(it){
-      S.post[id]=it.region==='near'?{
+      S.post[id]=(it.region==='near'&&/^(alert|welfare|econ)$/.test(catOf(it)))?{
         kind:'near',hook:'เตือน!! เรื่องใกล้ตัวที่ต้องรู้',pts:[],
         body:(it.facts||it.title_th||it.title).slice(0,150)+'...',
         q:'ส่งต่อเตือนคนที่บ้านด้วยนะ',src:it.source||'',
@@ -503,6 +524,7 @@ var ACT={
   },
   fetchRe:function(){ loadRealEstate(); },
   fetchPg:function(){ loadPage(); },
+  cat:function(id){S.cat=id;LS.set('sk_cat',id);render();var b=document.querySelector('.cat.on');if(b&&b.scrollIntoView)b.scrollIntoView({inline:'center',block:'nearest'})},
   size:function(){
     var total = 0;
     for(var k in localStorage){
@@ -529,7 +551,7 @@ var ACT={
   clrchat:function(){S.chat=[];S.chatErr='';LS.set('sk_chat',[]);render()},
   test:async function(){
     saveCfg();S.tst={t:'กำลังทดสอบ…',c:''};render(true);
-    try{await api('ping',[],30000);S.tst={t:'เชื่อมต่อได้ ✓ โหลดข่าวให้แล้ว ดูที่แท็บใกล้ตัว/ไทย/โลก',c:'var(--ok)'};loadNews()}
+    try{await api('ping',[],30000);S.tst={t:'เชื่อมต่อได้ ✓ โหลดข่าวให้แล้ว ดูที่แท็บข่าว',c:'var(--ok)'};loadNews()}
     catch(e){S.tst={t:e.message,c:'var(--bad)'}}
     render(true);
   },
