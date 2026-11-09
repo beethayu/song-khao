@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='6.1 · 2026-11-09';
+var VERSION='6.2 · 2026-11-09';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -270,7 +270,10 @@ function itemHtml(it,i,hot){
       if(!it.lung&&!S.retelling[it.id])b+='<button class="btn acc" data-act="retell" data-id="'+esc(it.id)+'">ให้ลุงเล่า</button>';
       if(!S.posting[it.id])b+='<button class="btn acc" data-act="post" data-id="'+esc(it.id)+'">'+(S.post[it.id]?'ทำโพสต์ใหม่':'สร้างโพสต์')+'</button>';
       if(S.post[it.id])b+='<button class="btn" data-act="cpost" data-id="'+esc(it.id)+'">คัดลอกโพสต์</button>';
-      if(S.post[it.id]&&S.post[it.id].imgPrompt)b+='<button class="btn" data-act="cimg" data-id="'+esc(it.id)+'">คัดลอกคำสั่งสร้างภาพ</button>';
+      if(S.post[it.id]&&S.post[it.id].imgPrompt){
+        b+='<a class="btn acc" href="https://chatgpt.com/?q='+encodeURIComponent(S.post[it.id].imgPrompt)+'" target="_blank" rel="noopener" data-act="cimg" data-id="'+esc(it.id)+'" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">🎨 สร้างภาพใน ChatGPT</a>';
+        b+='<button class="btn" data-act="cimg" data-id="'+esc(it.id)+'">คัดลอกคำสั่งสร้างภาพ</button>';
+      }
       b+='<button class="btn pri" data-act="ask" data-id="'+esc(it.id)+'">ถามลุง</button>';
     }
     
@@ -539,7 +542,7 @@ var ACT={
   tog:function(id){S.open[id]=!S.open[id];render(true)},
   retell:function(id){doRetell(id)},
   post:function(id){doPost(id)},
-  cimg:function(id,btn){var p=S.post[id];if(!p||!p.imgPrompt)return;clip(p.imgPrompt).then(function(){btn.textContent='คัดลอกแล้ว ✓ ไปวางใน Gemini/ChatGPT';setTimeout(function(){btn.textContent='คัดลอกคำสั่งสร้างภาพ'},2500)})},
+  cimg:function(id,btn){var p=S.post[id];if(!p||!p.imgPrompt)return;var t0=btn.textContent;clip(p.imgPrompt).then(function(){if(btn.tagName==='A'){toast('คัดลอกคำสั่งไว้แล้ว ถ้า ChatGPT ไม่ขึ้นคำสั่งให้ ก็กดวางได้เลย');return}btn.textContent='คัดลอกแล้ว ✓ ไปวางใน ChatGPT';setTimeout(function(){btn.textContent=t0},2500)}).catch(function(){})},
   cpost:function(id,btn){var p=S.post[id];if(!p)return;clip(postText(p)).then(function(){btn.textContent='คัดลอกแล้ว ✓';setTimeout(function(){btn.textContent='คัดลอกโพสต์'},1500)},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่ข้อความ')})},
   ask:function(id){var it=find(id);if(!it)return;S.ctx={id:id,title:it.title_th||it.title};S.chatErr='';go('chat')},
   copy:function(id,btn){
