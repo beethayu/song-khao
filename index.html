@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='6.5 · 2026-11-09';
+var VERSION='6.6 · 2026-11-09';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -475,19 +475,20 @@ function imgPromptOf(p){
   var L=[],n=1;
   function line(desc,txt){L.push('- Line '+(n++)+': '+desc+' "'+txt+'"')}
   L.push('Vertical 9:16 mobile thumbnail for a Thai news video, mood: '+mood+'. If a reference image is attached, follow its layout and spacing.');
-  L.push('Upper 60%: large, vibrant 3D Thai text on a dynamic '+bg+' gradient background with glowing light rays and abstract '+(al?'yellow':'red')+' accent bars.');
+  L.push('ONE seamless full-frame background from top to bottom: a dynamic '+bg+' gradient with glowing light rays, sparkles and abstract '+(al?'yellow':'red')+' accent streaks flowing through the whole image. No dividing line, no horizontal split, no separate panels or blocks, no change of background between top and bottom.');
+  L.push('Group the large, vibrant 3D Thai text and the illustration in the upper ~60% of the frame; the lower ~40% stays free of text so a video presenter can be placed there later, but it is the same continuous background.');
   L.push('Render every Thai word exactly as written below, with correct spelling, vowels and tone marks. Keep each line as one line and never split a word across lines. Do not add any other text anywhere.');
   L.push('');L.push('Text, top to bottom (centered, right side of the illustration where needed):');
   if(p.label)line('a slanted '+(al?'yellow banner with 3D red':'red banner with 3D white')+' text',p.label);
   line('massive 3D golden-yellow text with thick black and red outlines',p.head);
   splitTh(p.sub).forEach(function(t,i){if(t)line((i?'3D yellow text with white and dark outline':'3D white text with yellow and dark outline'),t)});
   if(p.big)L.push('- Line '+(n++)+': a giant 3D red number "'+p.big+'" with a thick black and white outline'+(p.unit?', followed on the same line by 3D yellow text "'+p.unit+'"':''));
-  if(p.pill)line('a wide '+(al?'black and yellow':'dark blue and red')+' banner across the image with 3D white text',p.pill);
+  if(p.pill)line('a rounded '+(al?'black and yellow':'red')+' badge (not a full-width bar) with 3D white text',p.pill);
   L.push('');L.push('Illustration:');
   L.push('- On the middle-left, a 3D illustration of '+vis+', compact, inside the top 60%, not covering any text. Any card, phone screen or document in the illustration must show only blank shapes, lines and icons, with no letters or words.');
-  L.push('');L.push('Bottom 40% (space for a video presenter added later):');
-  L.push('- No text at all. A dark, subtle '+bg+' gradient that continues smoothly from the top (not white, not a flat empty block).');
-  L.push('- Only along the very bottom edge, softly blurred decorative elements: '+decor+'. Keep the center of this zone clear and calm.');
+  L.push('');L.push('Lower ~40% (presenter space, same background):');
+  L.push('- No text and no large objects here. The light rays and sparkles from above continue down naturally so the image feels like one piece.');
+  L.push('- Only along the very bottom edge, small softly blurred decorative elements: '+decor+'. Keep the center clear.');
   L.push('');L.push('Do not include: human faces, real government or agency logos, watermarks, extra text.');
   return L.join('\n');
 }
