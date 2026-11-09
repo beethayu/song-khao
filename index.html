@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='7 · 2026-11-09';
+var VERSION='7.1 · 2026-11-09';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -140,7 +140,7 @@ var S={
   pgUrl:LS.get('sk_pgUrl',''),pgLoading:false,
   saved:LS.get('sk_saved',[]),
   chat:LS.get('sk_chat',[]),
-  ctx:null,tst:{t:'',c:''},busy:0,open:{},retelling:{},posting:{},post:LS.get('sk_post',{}),loading:false,sending:false,chatErr:'',wipeArm:false,reLoading:false,delArm:'',vidOpen:{},
+  ctx:null,tst:{t:'',c:''},busy:0,open:{},retelling:{},posting:{},post:LS.get('sk_post',{}),loading:false,sending:false,chatErr:'',wipeArm:false,reLoading:false,delArm:'',vidOpen:{},vgreen:LS.get('sk_vgreen',true),
   vchar:LS.get('sk_vchar','')
 };
 // หมวดในแท็บข่าว (เลื่อนซ้ายขวาได้)
@@ -348,7 +348,7 @@ function setHtml(){
   return '<div class="card"><div class="row"><label>API URL</label><input id="cu" value="'+esc(c.url)+'" placeholder="https://script.google.com/…" autocapitalize="off" autocorrect="off" spellcheck="false"></div><div class="row"><label>API KEY</label><input id="ck" type="password" value="'+esc(c.key)+'" placeholder="รหัสที่ตั้งไว้" autocapitalize="off" autocorrect="off"></div></div>'+
   '<div class="acts" style="margin:0 0 6px"><button class="btn pri" data-act="test">ทดสอบการเชื่อมต่อ</button></div><div class="note" id="tst" style="margin:0 4px 16px;color:'+(S.tst.c||'var(--mut)')+'">'+esc(S.tst.t)+'</div>'+
   '<div class="card pad"><div class="h2">ลุงใช้ Gemini</div><div class="hint">ข่าวที่ลุงเล่าแล้วเก็บไว้ในชีตและในเครื่อง เปิดอ่านได้แม้ไม่ได้ใช้ Claude ส่วนแชทต้องใช้ Gemini ผ่านหลังบ้าน</div></div>'+
-  '<div class="card pad"><div class="h2">ตัวละครคนเล่า (คำสั่งทำคลิป)</div><div class="hint" style="margin-bottom:8px">บรรยายหน้าตา/การแต่งตัว/ฉากของลุงเป็นภาษาอังกฤษ ปล่อยว่างจะใช้ค่าเริ่มต้น และควรแนบภาพลุงไปกับทุกคลิปให้หน้าเหมือนเดิม</div><textarea id="vchar" rows="4" placeholder="'+esc(VCHAR_DEF)+'" style="font-size:16px;width:100%;padding:8px;border:1px solid #ccc;border-radius:8px">'+esc(S.vchar)+'</textarea></div>'+
+  '<div class="card pad"><div class="h2">ตัวละครคนเล่า (คำสั่งทำคลิป)</div><div class="hint" style="margin-bottom:8px">บรรยายหน้าตา/การแต่งตัว/ฉากของลุงเป็นภาษาอังกฤษ ปล่อยว่างจะใช้ค่าเริ่มต้น และควรแนบภาพลุงไปกับทุกคลิปให้หน้าเหมือนเดิม</div><textarea id="vchar" rows="4" placeholder="'+esc(VCHAR_DEF)+'" style="font-size:16px;width:100%;padding:8px;border:1px solid #ccc;border-radius:8px">'+esc(S.vchar)+'</textarea><label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:15px"><input type="checkbox" id="vgreen" '+(S.vgreen?'checked':'')+' style="width:22px;height:22px"> ภาพลุงเป็นฉากเขียว (ให้คลิปคงพื้นเขียวไว้ลบใน CapCut)</label></div>'+
   '<div class="card pad"><div class="h2">เครื่องมือ</div><div class="acts"><button class="btn" data-act="size">เช็คพื้นที่เครื่อง</button><button class="btn" data-act="hist">ดูประวัติโพสต์ ('+Object.keys(S.post).length+')</button></div><div class="note" id="sizeOut" style="margin-top:10px;color:var(--mut)"></div></div>'+
   '<div class="card pad"><div class="h2">ข้อมูลในเครื่อง</div><div class="hint" style="margin-bottom:10px">ข่าวที่เก็บไว้ '+S.saved.length+' · ข้อความแชท '+S.chat.length+'</div><button class="btn" data-act="wipe">'+(S.wipeArm?'แตะอีกครั้งเพื่อยืนยันล้าง':'ล้างข้อมูลในเครื่อง')+'</button></div>'+
   '<div class="note" style="text-align:center">ส่งข่าว · เวอร์ชัน '+VERSION+'</div>';
@@ -511,7 +511,7 @@ function imgPromptOf(p){
   return L.join('\n');
 }
 // คำสั่งทำคลิปลุงเล่า: แบ่งสคริปต์ลุงเป็นช่วง ~8 วินาที (Flow/Veo ทำได้คลิปละ 8 วิ) · บทพูดไทยมาจากที่ลุงเล่าตรง ๆ
-var VCHAR_DEF='a friendly Thai man in his 60s with short grey hair and round glasses, wearing a simple indigo mor-hom shirt, sitting at a wooden table in an old-style Thai coffee shop with vintage posters, softly blurred background';
+var VCHAR_DEF='the same elderly Thai man as in the attached image, with the same face, hair and clothing';
 function vidSegs(t){
   var words=String(t||'').replace(/\s+/g,' ').trim().split(' '),out=[],cur='';
   words.forEach(function(w){
@@ -524,14 +524,15 @@ function vidClipPrompt(it,i,segs){
   var n=segs.length,ch=S.vchar||VCHAR_DEF;
   var cat=it.region==='near'?catOf(it):'';
   var ex=it.mood==='serious'?'calm, concerned and respectful expression, gentle voice':(cat==='alert'||cat==='welfare'||cat==='econ')?'serious but caring expression, clear firm voice':'lively, warm expression with a slight knowing smile, expressive voice';
-  return ['Vertical 9:16 video, 8 seconds. Use the attached image as the presenter (keep the same face and outfit): '+ch+'.',
-    'He looks straight into the camera and speaks Thai naturally with accurate lip-sync, '+ex+', small natural hand gestures. Medium close-up, static camera, soft natural light.'+(i===n-1?' He ends with a small nod.':''),
+  var bgl=S.vgreen?'Keep the plain, solid bright green chroma-key background exactly as in the attached image: evenly lit, flat, no shadows, no objects, no color change, so it can be removed later.':'';
+  return ['Vertical 9:16 video, 8 seconds. Use the attached image as the presenter (keep the same face and outfit): '+ch+'.'+(bgl?' '+bgl:''),
+    'He looks straight into the camera and speaks Thai naturally with accurate lip-sync, '+ex+', small natural hand gestures kept close to the body. Medium shot, static camera, soft even light.'+(i===n-1?' He ends with a small nod.':''),
     'He says in Thai: "'+segs[i]+'"',
     'No subtitles, no on-screen text, no background music, no other people.'].join('\n');
 }
 function vidHtml(it){
   var segs=vidSegs(it.lung);
-  return '<div class="lh">คำสั่งทำคลิป · '+segs.length+' คลิป คลิปละ 8 วิ (Flow)</div><div class="note">ตั้ง 9:16 + 8 วินาทีใน Flow · ใส่ภาพลุงเป็นเฟรมแรก (Frames to video) · กดคัดลอกทีละคลิปแล้ววางได้เลย</div>'+
+  return '<div class="lh">คำสั่งทำคลิป · '+segs.length+' คลิป คลิปละ 8 วิ (Flow)</div><div class="note">ตั้ง 9:16 + 8 วินาทีใน Flow · แนบภาพลุงทุกคลิป · กดคัดลอกทีละคลิปแล้ววางได้เลย'+(S.vgreen?' · คลิปคงฉากเขียวไว้ ลบใน CapCut ด้วย \'คีย์สี (Chroma key)\'':'')+'</div>'+
     segs.map(function(sg,i){return '<div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0"><div class="note" style="margin:0 0 6px">คลิป '+(i+1)+': '+esc(sg)+'</div><button class="btn acc" data-act="cclip" data-id="'+esc(it.id)+'" data-i="'+i+'">คัดลอกคลิป '+(i+1)+'</button></div>'}).join('');
 }
 // แบบที่ 2: ฉากจริงเป็นพื้นหลัง + คนในข่าวจากรูปที่ผู้ใช้แนบ (สไตล์เพจข่าวไวรัล) · ตัวหนังสือวางแบบเดิม · ไม่ให้ AI ปั้นหน้าคนจริงเอง
@@ -736,6 +737,7 @@ $('#page').addEventListener('click',function(e){
 $('#page').addEventListener('change',function(e){
   if(e.target.id==='cu'||e.target.id==='ck') saveCfg();
   if(e.target.id==='pgUrl'){ S.pgUrl=e.target.value; LS.set('sk_pgUrl',S.pgUrl); }
+  if(e.target.id==='vgreen'){ S.vgreen=e.target.checked; LS.set('sk_vgreen',S.vgreen); toast(S.vgreen?'คลิปจะคงฉากเขียวไว้':'คลิปจะใช้ฉากตามภาพลุง'); }
   if(e.target.id==='vchar'){ S.vchar=e.target.value.trim(); LS.set('sk_vchar',S.vchar); toast('บันทึกตัวละครแล้ว'); }
   if(e.target.id==='reUrl') { S.reUrl = e.target.value; LS.set('sk_reUrl', S.reUrl); }
   var act = e.target.getAttribute('data-act');
