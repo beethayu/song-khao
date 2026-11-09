@@ -49,6 +49,19 @@ const SCORE_PROMPT = [
   'ตอบเป็น JSON array ของ object {"d":number,"sides":string,"mood":string} จำนวนและลำดับตรงกับหัวข้อที่ให้'
 ].join('\n');
 
+// แท็บ "ใกล้ตัว" (region = near): เรื่องที่กระทบเงิน/ความปลอดภัยของชาวบ้าน ใช้คอลัมน์ drama เก็บคะแนน "ความใกล้ตัว"
+const NEAR_SCORE_PROMPT = [
+  'คุณเป็นบรรณาธิการเพจข่าวเตือนภัยและสิทธิประชาชน ให้คะแนนหัวข้อข่าวแต่ละข้อว่า "ใกล้ตัวชาวบ้าน" แค่ไหน',
+  'd = คะแนน 0-10',
+  '  สูง 7-10: เตือนภัยมิจฉาชีพ/ฉ้อโกง, ภัยธรรมชาติหรือสภาพอากาศรุนแรงที่ระบุช่วงเวลา/พื้นที่, สิทธิ/สวัสดิการ/กฎหมายที่กระทบชาวบ้านโดยตรง (บัตรสวัสดิการ ค่ารักษา ค่าเช่า ใบขับขี่ ประกัน ภาษี), สินค้า/อาหารอันตรายและการคุ้มครองผู้บริโภค, วิธีรับมือหรือเบอร์โทรด่วน',
+  '  กลาง 4-6: นโยบายหรือมาตรการที่ยังไม่ชัดว่ากระทบชาวบ้านอย่างไร',
+  '  ต่ำ 0-2: การเมืองล้วน ดราม่าตัวบุคคล ข่าวธุรกิจ/ตัวเลขล้วน ข่าวต่างประเทศที่ไม่เกี่ยวกับคนไทย บันเทิง กีฬา',
+  '  เรื่องสถาบันพระมหากษัตริย์ ให้ d = 0',
+  'sides = สตริงว่างเสมอ',
+  'mood = "serious" (มีผู้เสียชีวิต/บาดเจ็บ ภัยพิบัติ เหยื่อ เด็ก) | "neutral" (นอกนั้น)',
+  'ตอบเป็น JSON array ของ object {"d":number,"sides":string,"mood":string} จำนวนและลำดับตรงกับหัวข้อที่ให้'
+].join('\n');
+
 function dr_(o) { return (o.drama === '' || o.drama == null) ? null : Number(o.drama); }
 function rank_(o) { const d = dr_(o); return (d === null ? 4 : d) * 12 + (Number(o.score) || 0); }
 
@@ -87,7 +100,8 @@ const API = {
   factsFromText: factsFromText,
   retell: retell,
   makePost: makePost,
-  chat: chat
+  chat: chat,
+  getGroupRealEstate: getGroupRealEstate
 };
 
 // ใช้ครั้งเดียวในหน้า Apps Script: ขอสิทธิ์ + สร้างชีต
@@ -238,23 +252,37 @@ function scorePending(limit) {
   const todo = rows_(sh).filter(function (o) {
     return o.title && dr_(o) === null && Number(o.ts) >= since;
   });
-  todo.sort(function (a, b) { return Number(b.score) - Number(a.score); });
+  // ข่าวใกล้ตัวให้คะแนนก่อน แล้วค่อยเรียงตามคะแนนความนิยม
+  todo.sort(function (a, b) {
+    const na = a.region === 'near' ? 1 : 0, nb = b.region === 'near' ? 1 : 0;
+    return nb - na || Number(b.score) - Number(a.score);
+  });
   const batch = todo.slice(0, lim);
   if (!batch.length) return { done: 0, left: 0 };
+  const near = batch.filter(function (o) { return o.region === 'near'; });
+  const rest = batch.filter(function (o) { return o.region !== 'near'; });
+  const done = scoreBatch_(sh, near, NEAR_SCORE_PROMPT, true) + scoreBatch_(sh, rest, SCORE_PROMPT, false);
+  return { done: done, left: Math.max(todo.length - done, 0) };
+}
+
+function scoreBatch_(sh, batch, sysPrompt, isNear) {
+  if (!batch.length) return 0;
   const prompt = JSON.stringify(batch.map(function (o) { return o.title_th || o.title; }));
-  const arr = JSON.parse(gemini_(SCORE_PROMPT, [{ role: 'user', parts: [{ text: prompt }] }], 0.2, true));
+  const arr = JSON.parse(gemini_(sysPrompt, [{ role: 'user', parts: [{ text: prompt }] }], 0.2, true));
   if (!Array.isArray(arr) || arr.length !== batch.length) throw new Error('ให้คะแนนไม่ครบ ลองใหม่');
   let done = 0;
   batch.forEach(function (o, i) {
     const r = arr[i] || {};
     const d = Math.max(0, Math.min(10, Math.round(Number(r.d))));
     if (isNaN(d)) return;
-    const mood = ['jig', 'neutral', 'serious'].indexOf(r.mood) >= 0 ? r.mood : 'neutral';
-    sh.getRange(o._row, 13, 1, 3).setValues([[d, String(r.sides || '').slice(0, 80), mood]]);
+    const moods = isNear ? ['neutral', 'serious'] : ['jig', 'neutral', 'serious'];
+    const mood = moods.indexOf(r.mood) >= 0 ? r.mood : 'neutral';
+    const sides = isNear ? '' : String(r.sides || '').slice(0, 80);
+    sh.getRange(o._row, 13, 1, 3).setValues([[d, sides, mood]]);
     if (o.lung) sh.getRange(o._row, 10).setValue(''); // ล้างสำนวนเก่า ให้ลุงเล่าใหม่ตามสไตล์ใหม่
     done++;
   });
-  return { done: done, left: Math.max(todo.length - done, 0) };
+  return done;
 }
 
 // ---------- ข่าวย่อ (ตัวดึงข่าวเปิดอ่านเนื้อข่าว แล้วส่งมาให้ Gemini สรุปด้วยคำของมัน) ----------
@@ -349,7 +377,11 @@ function newsInfo_(o) {
 function retellText_(o) {
   const mood = o.mood || 'jig';
   let how;
-  if (mood === 'serious') {
+  if (o.region === 'near') {
+    how = 'ข่าวนี้เป็นข่าวเตือน/สิทธิที่ใกล้ตัวชาวบ้าน เล่าตรง ๆ กระชับ 3–5 ประโยค ไม่เล่นมุก ไม่ขู่เกินจริง: เปิดด้วยคำเตือนสั้น ๆ ' +
+      'บอกว่าเรื่องนี้กระทบใคร และควรทำอะไร ใส่ตัวเลข วันที่ เบอร์โทร เฉพาะที่มีอยู่ในข้อมูลเท่านั้น ' +
+      'ถ้าข้อมูลมีแค่หัวข้อ ให้บอกตรง ๆ ว่ารู้แค่นี้ ให้ตรวจกับหน่วยงานทางการหรือต้นฉบับอีกที ปิดท้ายชวนให้ส่งต่อเตือนคนที่บ้าน';
+  } else if (mood === 'serious') {
     how = 'ข่าวนี้อ่อนไหว เล่าสุภาพ เห็นใจ ห้ามเล่นมุกหรือจิกกัด 3–4 ประโยค ปิดท้ายด้วยประโยคห่วงใยหรือเตือนใจ ไม่ต้องถามให้เลือกข้าง';
   } else if (mood === 'neutral') {
     how = 'ข่าวนี้อ่อนไหว (การเมือง/ศาสนา/ประเด็นแบ่งขั้ว) เล่าเป็นกลาง ไม่เข้าข้างและไม่จิกฝ่ายใดเป็นพิเศษ 3–4 ประโยค ปิดท้ายถามความเห็นแบบเปิด ไม่ชี้นำ';
@@ -366,6 +398,7 @@ function retellText_(o) {
 function makePost(id) {
   const o = rows_(sheet_()).filter(function (x) { return x.id === id; })[0];
   if (!o) throw new Error('ไม่พบข่าวนี้ (อาจถูกลบแล้ว)');
+  if (o.region === 'near') return makeNearPost_(o);
   const mood = o.mood || 'jig';
   const tone = mood === 'serious' ? 'ข่าวอ่อนไหว: น้ำเสียงสุภาพเห็นใจ ห้ามมุกหรือจิกกัด ไม่ต้องมีคำถามเลือกข้าง (q ให้เป็นประโยคชวนแสดงความรู้สึก/ห่วงใย)'
     : mood === 'neutral' ? 'ข่าวอ่อนไหว: เป็นกลาง ไม่เข้าข้าง q ให้เป็นคำถามเปิดไม่ชี้นำ'
@@ -379,6 +412,26 @@ function makePost(id) {
   try { j = JSON.parse(raw); } catch (e) { throw new Error('ลุงเรียบเรียงไม่สำเร็จ ลองกดใหม่'); }
   const tags = (j.tags || []).map(function (t) { t = String(t).replace(/\s+/g, ''); return t.charAt(0) === '#' ? t : '#' + t; }).slice(0, 5);
   return { hook: String(j.hook || '').slice(0, 90), body: String(j.body || ''), q: String(j.q || ''), tags: tags };
+}
+
+// โพสต์สไตล์ "เตือน!" สำหรับข่าวใกล้ตัว: hook เตือน + สรุป 3 ข้อสั้น + แหล่งข่าว (src มาจากข้อมูลข่าว ไม่ให้ Gemini แต่ง)
+function makeNearPost_(o) {
+  const tone = o.mood === 'serious' ? 'มีผู้ได้รับผลกระทบรุนแรง: น้ำเสียงสุภาพ ห่วงใย ห้ามมุก' : 'น้ำเสียงตรง กระชับ เตือนด้วยความห่วงใย ไม่ขู่เกินจริง';
+  const prompt = 'ทำโพสต์เตือนภัย/สิทธิใกล้ตัวสำหรับ Facebook จากข่าวนี้ ตอบเป็น JSON เท่านั้น รูปแบบ {"hook":"","pts":["","",""],"q":"","tags":["","","","",""]}\n' +
+    '- hook: พาดหัวคำเตือน ขึ้นต้นด้วยคำอย่าง "เตือน!" "ต้องรู้!!" "เตรียมรับมือ!" ไม่เกิน 40 ตัวอักษร (ใช้บนการ์ดภาพ)\n' +
+    '- pts: สรุป 3 ข้อสั้นมาก ข้อละไม่เกิน 45 ตัวอักษร เอาไปใช้ได้ทันที ใส่ตัวเลข วันที่ เบอร์โทร เฉพาะที่มีในข้อมูลด้านล่างเท่านั้น ห้ามแต่งหรือเดา\n' +
+    '- q: ประโยคชวนส่งต่อเตือนคนใกล้ตัว 1 ประโยค\n- tags: แฮชแท็กไทย 5 อัน ขึ้นต้นด้วย # ไม่มีเว้นวรรค\n' +
+    tone + '\n\n' + newsInfo_(o);
+  const raw = gemini_(LUNG, [{ role: 'user', parts: [{ text: prompt }] }], 0.5, true);
+  let j;
+  try { j = JSON.parse(raw); } catch (e) { throw new Error('ลุงเรียบเรียงไม่สำเร็จ ลองกดใหม่'); }
+  const pts = (j.pts || []).map(function (t) { return String(t).replace(/^[•\-\s]+/, '').slice(0, 60); }).filter(String).slice(0, 3);
+  const tags = (j.tags || []).map(function (t) { t = String(t).replace(/\s+/g, ''); return t.charAt(0) === '#' ? t : '#' + t; }).slice(0, 5);
+  return {
+    kind: 'near', hook: String(j.hook || '').slice(0, 60), pts: pts,
+    body: pts.map(function (t) { return '• ' + t; }).join('\n'),
+    q: String(j.q || ''), tags: tags, src: String(o.source || '')
+  };
 }
 
 // ---------- แชท ----------
@@ -446,4 +499,71 @@ function gemini_(system, contents, temp, asJson, tools) {
     }
   }
   throw new Error('Gemini ไม่ว่าง' + (last ? ' [' + last + ']' : '') + ' รอสักครู่แล้วกดส่งใหม่');
+}
+
+// ==========================================
+// ฟังก์ชันดึงอสังหาฯ จาก Facebook Groups (Apify)
+// กู้คืนตามโค้ดที่ใช้งานอยู่ใน Apps Script เพื่อไม่ให้หายตอน deploy-gas
+// ต้องตั้ง APIFY_TOKEN ใน Script Properties
+// ==========================================
+function getGroupRealEstate(groupUrl) {
+  const token = PropertiesService.getScriptProperties().getProperty('APIFY_TOKEN');
+  if (!token) return { ok: false, error: 'ยังไม่ได้ตั้งค่า APIFY_TOKEN' };
+
+  const actorId = 'apify~facebook-groups-scraper';
+  const apiUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${token}`;
+
+  // ดึง 30 โพสต์ที่ "ยอดนิยมที่สุด" (ลดจำนวนลงเพราะคัดกรองแล้ว)
+  const payload = {
+    "startUrls": [{ "url": groupUrl }],
+    "resultsLimit": 30,
+    "viewOption": "TOP_POSTS" // <--- สั่งให้เอาโพสต์ยอดนิยม!
+  };
+
+  try {
+    const res = UrlFetchApp.fetch(apiUrl, {
+      method: 'POST',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    const data = JSON.parse(res.getContentText());
+    if (!Array.isArray(data)) return { ok: false, error: 'Apify ตอบกลับผิดรูปแบบ' };
+
+    let processed = [];
+    let seenTexts = {};
+
+    data.forEach(post => {
+      const text = (post.text || post.message || '').trim();
+      if (!text) return;
+
+      const textKey = text.substring(0, 50);
+      if (seenTexts[textKey]) return; // กันสแปมซ้ำ
+      seenTexts[textKey] = true;
+
+      const likes = post.reactionsCount || post.likesCount || 0;
+      const comments = post.commentsCount || 0;
+      const shares = post.sharesCount || 0;
+
+      processed.push({
+        id: post.postId || post.url,
+        title_th: text.substring(0, 80) + (text.length > 80 ? '...' : ''),
+        title: text.substring(0, 150),
+        source: 'Facebook Group',
+        url: post.url || groupUrl,
+        ts: new Date(post.time || Date.now()).getTime(),
+        tag: 'อสังหาฯ',
+        img: post.media && post.media.length > 0 ? post.media[0].thumbnail : '',
+        metric: `❤️ ${likes} · 💬 ${comments} · 🔁 ${shares}`
+      });
+    });
+
+    // ดึงมาแค่ 10 อันดับแรก (ตามที่ Facebook จัดอันดับมาให้แล้ว)
+    const topResults = processed.slice(0, 10);
+
+    return { ok: true, result: topResults };
+  } catch (e) {
+    return { ok: false, error: e.toString() };
+  }
 }

@@ -83,7 +83,7 @@ def trends(geo, region, label):
     return out
 
 
-def gnews(query, region, hl, gl, ceid, label):
+def gnews(query, region, hl, gl, ceid, label, limit=25):
     """Google News RSS ค้นหา (ไม่มีตัวเลขปฏิสัมพันธ์ ใช้ลำดับแทน)"""
     q = urllib.parse.quote(query)
     root = ET.fromstring(get(f"https://news.google.com/rss/search?q={q}&hl={hl}&gl={gl}&ceid={ceid}"))
@@ -98,7 +98,7 @@ def gnews(query, region, hl, gl, ceid, label):
             url=(it.findtext("link") or "").strip(), raw=max(50 - i, 1), metric=label,
             snippet="", tag=query.split(" ")[0],
         ))
-        if i >= 24:
+        if i >= limit - 1:
             break
     return out
 
@@ -151,6 +151,20 @@ SOURCES = [
     ("reddit-worldnews", lambda: reddit("worldnews", "world")),
     ("reddit-news", lambda: reddit("news", "world")),
 ]
+
+
+# แท็บ "ใกล้ตัว": เตือนภัย/สิทธิ/มิจฉาชีพ ค้นจาก Google News RSS (ใช้ได้อยู่แล้ว) แหล่งละ 10 ข่าว
+NEAR_Q = [
+    ("เตือนภัย มิจฉาชีพ when:2d", "เตือนภัยมิจฉาชีพ"),
+    ("ตำรวจไซเบอร์ เตือน when:3d", "ตำรวจไซเบอร์เตือน"),
+    ("สคบ. เตือน when:3d", "สคบ.เตือน"),
+    ("ปภ. เตือน when:1d", "ปภ.เตือน"),
+    ("กรมอุตุนิยมวิทยา เตือน ฝนตกหนัก when:1d", "เตือนสภาพอากาศ"),
+    ("สิทธิ ประชาชน ต้องรู้ when:2d", "สิทธิที่ต้องรู้"),
+    ("สปสช. สิทธิ บัตรทอง when:3d", "สิทธิสุขภาพ"),
+]
+SOURCES += [("gnews-near-" + str(i), (lambda q=q, l=l: gnews(q, "near", "th", "TH", "TH:th", l, 10)))
+            for i, (q, l) in enumerate(NEAR_Q)]
 
 
 RSS_TH = [

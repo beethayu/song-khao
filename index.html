@@ -93,7 +93,7 @@ body[data-tab=chat] #comp{display:flex}
 body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 70px)}
 </style>
 </head>
-<body data-tab="th">
+<body data-tab="near">
 <div id="sbar"></div>
 <div id="app">
   <header>
@@ -102,9 +102,12 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
   </header>
   <div id="page"></div>
   <nav>
+    <button data-tab="near"><svg viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>ใกล้ตัว</button>
     <button data-tab="th"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>ไทย</button>
     <button data-tab="world"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>โลก</button>
+    <!-- แท็บอสังหาฯ พักไว้ก่อน (โค้ด tab "re" ยังอยู่ครบ เปิดกลับโดยเอา comment ออก)
     <button data-tab="re"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>อสังหาฯ</button>
+    -->
     <button data-tab="saved"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>เก็บไว้</button>
     <button data-tab="chat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>แชท</button>
     <button data-tab="set"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>ตั้งค่า</button>
@@ -115,7 +118,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='4 · 2026-11-07';
+var VERSION='5 · 2026-11-09';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -123,17 +126,19 @@ var LS={
   get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
   set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 };
-var TABS={th:'ข่าวไทย',world:'ข่าวโลก',re:'อสังหาฯ (กลุ่ม)',saved:'เก็บไว้',chat:'แชท',set:'ตั้งค่า'};
+var TABS={near:'ข่าวใกล้ตัว',th:'ข่าวไทย',world:'ข่าวโลก',re:'อสังหาฯ (กลุ่ม)',saved:'เก็บไว้',chat:'แชท',set:'ตั้งค่า'};
 var S={
-  tab:LS.get('sk_tab','th'),
-  news:LS.get('sk_news',{th:[],world:[],at:0}),
+  tab:LS.get('sk_tab','near'),
+  news:LS.get('sk_news',{near:[],th:[],world:[],at:0}),
   re:LS.get('sk_re',[]), // เก็บข้อมูลอสังหาฯ
   reUrl:LS.get('sk_reUrl',''), // เก็บ URL กลุ่มล่าสุด
   saved:LS.get('sk_saved',[]),
   chat:LS.get('sk_chat',[]),
   ctx:null,tst:{t:'',c:''},busy:0,open:{},retelling:{},posting:{},post:LS.get('sk_post',{}),loading:false,sending:false,chatErr:'',wipeArm:false,reLoading:false
 };
-if(!TABS[S.tab]||S.tab==='chat')S.tab='th';
+if(!TABS[S.tab]||S.tab==='chat'||S.tab==='re')S.tab='near';
+if(!S.news.near)S.news.near=[];
+function isNews(t){return t==='near'||t==='th'||t==='world'}
 
 function cfg(){var c=LS.get('sk_cfg',{});return {url:c.url||DEFAULT_URL,key:c.key||''}}
 function ago(ts){
@@ -168,13 +173,13 @@ async function api(fn,args,ms){
 
 // ---------- ข้อมูล ----------
 function find(id){
-  var all=S.news.th.concat(S.news.world,S.saved,S.re);
+  var all=S.news.near.concat(S.news.th,S.news.world,S.saved,S.re);
   for(var i=0;i<all.length;i++)if(all[i].id===id)return all[i];
   return null;
 }
 function isSaved(id){return S.saved.some(function(x){return x.id===id})}
 function setLung(id,t){
-  [S.news.th,S.news.world,S.saved,S.re].forEach(function(l){l.forEach(function(x){if(x.id===id)x.lung=t})});
+  [S.news.near,S.news.th,S.news.world,S.saved,S.re].forEach(function(l){l.forEach(function(x){if(x.id===id)x.lung=t})});
   LS.set('sk_news',S.news);LS.set('sk_saved',S.saved);LS.set('sk_re',S.re);
 }
 async function loadNews(){
@@ -183,8 +188,8 @@ async function loadNews(){
   if(!c.url||!c.key){render(true);return}
   S.loading=true;$('#rf').classList.add('spin');
   try{
-    var r=await Promise.all([api('list',['th',40]),api('list',['world',40])]);
-    S.news={th:r[0],world:r[1],at:Date.now()};
+    var r=await Promise.all([api('list',['th',40]),api('list',['world',40]),api('list',['near',40]).catch(function(){return S.news.near})]);
+    S.news={th:r[0],world:r[1],near:r[2],at:Date.now()};
     LS.set('sk_news',S.news);
     S.saved.forEach(function(s){var f=find(s.id);if(f&&f!==s&&f.lung)s.lung=f.lung});
     LS.set('sk_saved',S.saved);
@@ -247,7 +252,7 @@ function itemHtml(it,i,hot){
   
   var imgHtml = it.img ? '<img src="'+esc(it.img)+'" style="width:100%;height:180px;object-fit:cover;border-radius:8px;margin-top:10px;">' : '';
   
-  return '<div class="n"><button class="nh" data-act="tog" data-id="'+esc(it.id)+'"><span class="rk'+(hot?' hot':'')+'">'+(i+1)+'</span><span class="nt"><div class="lab">'+esc(it.metric||it.tag||'')+(it.drama!=null?' · ดราม่า '+it.drama+'/10':'')+'</div><div class="ttl">'+esc(it.title_th||it.title)+'</div>'+(it.title_th&&!it.img?'<div class="orig">'+esc(it.title)+'</div>':'')+(it.sides?'<div class="sd">เลือกข้าง: '+esc(it.sides)+'</div>':'')+'<div class="sub">'+esc(it.source||'')+(it.ts?' · อัปเดต '+ago(it.ts):'')+'</div></span></button>'+(op?imgHtml:'')+b+'</div>';
+  return '<div class="n"><button class="nh" data-act="tog" data-id="'+esc(it.id)+'"><span class="rk'+(hot?' hot':'')+'">'+(i+1)+'</span><span class="nt"><div class="lab">'+esc(it.metric||it.tag||'')+(it.drama!=null?(it.region==='near'?' · ใกล้ตัว ':' · ดราม่า ')+it.drama+'/10':'')+'</div><div class="ttl">'+esc(it.title_th||it.title)+'</div>'+(it.title_th&&!it.img?'<div class="orig">'+esc(it.title)+'</div>':'')+(it.sides?'<div class="sd">เลือกข้าง: '+esc(it.sides)+'</div>':'')+'<div class="sub">'+esc(it.source||'')+(it.ts?' · อัปเดต '+ago(it.ts):'')+'</div></span></button>'+(op?imgHtml:'')+b+'</div>';
 }
 function listHtml(list,mode){
   var c=cfg();
@@ -260,6 +265,7 @@ function listHtml(list,mode){
 
   if(!list.length){
     if(mode==='saved')return '<div class="card empty"><div class="h2">ยังไม่มีข่าวที่เก็บไว้</div><div class="hint">กดเปิดข่าว แล้วกด "เก็บไว้" เพื่อเก็บเป็นวัตถุดิบทำคอนเทนต์</div></div>';
+    if(mode==='near')return '<div class="card empty"><div class="h2">ยังไม่มีข่าวใกล้ตัว</div><div class="hint">ตัวดึงข่าวทำงานทุก 2 ชั่วโมง ข่าวเตือนภัย/สิทธิจะขึ้นหลังรอบถัดไป กดรีเฟรชด้านบนเพื่อโหลดใหม่</div></div>';
     return '<div class="card empty"><div class="h2">ยังไม่มีข่าว</div><div class="hint">ตัวดึงข่าวทำงานทุก 2 ชั่วโมง กดปุ่มรีเฟรชด้านบนเพื่อโหลดใหม่</div></div>';
   }
   
@@ -308,8 +314,8 @@ function render(keep){
   document.body.setAttribute('data-tab',S.tab);
   Array.prototype.forEach.call(document.querySelectorAll('nav button'),function(b){b.classList.toggle('on',b.getAttribute('data-tab')===S.tab)});
   $('#ttl').textContent=TABS[S.tab];
-  var n=(S.tab==='th'||S.tab==='world')?S.news[S.tab].length:0;
-  $('#sub').textContent=S.tab==='th'||S.tab==='world'?(S.news.at?'อัปเดต '+hhmm(S.news.at)+' · '+n+' ข่าว':'ยังไม่เคยโหลด'):S.tab==='saved'?S.saved.length+' ข่าว':'';
+  var n=isNews(S.tab)?S.news[S.tab].length:0;
+  $('#sub').textContent=isNews(S.tab)?(S.news.at?'อัปเดต '+hhmm(S.news.at)+' · '+n+' ข่าว':'ยังไม่เคยโหลด'):S.tab==='saved'?S.saved.length+' ข่าว':'';
   var h;
   if(S.tab==='chat')h=chatHtml();
   else if(S.tab==='set')h=setHtml();
@@ -332,10 +338,52 @@ function clip(t){
     document.body.removeChild(ta);
   });
 }
-function postText(p){return p.hook+'\n\n'+p.body+'\n\n'+p.q+'\n\n'+p.tags.join(' ')}
+function postText(p){return p.hook+'\n\n'+p.body+'\n\n'+p.q+(p.src?'\n\nที่มา: '+p.src:'')+'\n\n'+p.tags.join(' ')}
 var IMGC={};
+function wrapTh(x,text,maxW){
+  var segs=(window.Intl&&Intl.Segmenter)?Array.from(new Intl.Segmenter('th',{granularity:'word'}).segment(text),function(s){return s.segment}):text.split('');
+  var lines=[],cur='';
+  segs.forEach(function(s){var t=cur+s;if(x.measureText(t).width>maxW&&cur){lines.push(cur.trim());cur=s}else cur=t});
+  if(cur.trim())lines.push(cur.trim());
+  return lines;
+}
+// การ์ดข่าวใกล้ตัว: ป้ายแดง พาดหัวเหลืองตัวใหญ่ สรุป 3 ข้อสีขาว + ที่มา
+function postImgNear(p){
+  var W=1080,c=document.createElement('canvas');c.width=W;c.height=W;var x=c.getContext('2d');
+  var F='-apple-system,"Thonburi","Sarabun",sans-serif';
+  x.fillStyle='#101820';x.fillRect(0,0,W,W);
+  var r=36;x.fillStyle='#b3141c';x.beginPath();
+  x.moveTo(60+r,60);x.arcTo(W-60,60,W-60,W-60,r);x.arcTo(W-60,W-60,60,W-60,r);x.arcTo(60,W-60,60,60,r);x.arcTo(60,60,W-60,60,r);x.closePath();x.fill();
+  x.strokeStyle='#fff';x.lineWidth=6;x.stroke();
+  var pts=(p.pts&&p.pts.length)?p.pts:String(p.body||'').split('\n').map(function(t){return t.replace(/^[•\s]+/,'')}).filter(String).slice(0,3);
+  var maxW=W-240,fh=96,fp=50,hl,pl,hh,total;
+  for(;;){
+    x.font='800 '+fh+'px '+F;hl=wrapTh(x,p.hook,maxW);
+    x.font='600 '+fp+'px '+F;pl=pts.map(function(t){return wrapTh(x,'• '+t,maxW-10)});
+    hh=hl.length*fh*1.3;
+    total=hh+40+pl.reduce(function(a,l){return a+l.length*fp*1.4+14},0);
+    if(total<=700||(fh<=56&&fp<=34))break;
+    if(fh>56)fh-=6;if(fp>34)fp-=2;
+  }
+  var y=130;x.textBaseline='top';
+  x.fillStyle='#ffe14d';x.font='800 '+fh+'px '+F;
+  hl.forEach(function(l,i){x.fillText(l,120,y+i*fh*1.3)});
+  y+=hh+40;x.fillStyle='#fff';x.font='600 '+fp+'px '+F;
+  pl.forEach(function(ls){ls.forEach(function(l,i){x.fillText(l,120+(i?36:0),y);y+=fp*1.4});y+=14});
+  x.fillStyle='#ffd0d0';x.font='500 32px '+F;
+  var src=p.src?'ที่มา: '+p.src:'';
+  while(src.length>8&&x.measureText(src).width>W-240)src=src.slice(0,-2);
+  if(src)x.fillText(src,120,W-170);
+  x.fillText('ส่งข่าว · ลุงเล่า',120,W-120);
+  return c.toDataURL('image/png');
+}
 function postImg(p){
-  if(IMGC[p.hook])return IMGC[p.hook];
+  var key=(p.kind||'')+'|'+p.hook+'|'+(p.body||'').length;
+  if(IMGC[key])return IMGC[key];
+  if(p.kind==='near')return IMGC[key]=postImgNear(p);
+  return IMGC[key]=postImgBase(p);
+}
+function postImgBase(p){
   var W=1080,c=document.createElement('canvas');c.width=W;c.height=W;var x=c.getContext('2d');
   var g=x.createLinearGradient(0,0,W,W);g.addColorStop(0,'#1d2b4a');g.addColorStop(1,'#0a0f1f');x.fillStyle=g;x.fillRect(0,0,W,W);
   x.fillStyle='#ff8a3d';x.fillRect(90,150,120,10);
@@ -351,7 +399,7 @@ function postImg(p){
   }
   lines.forEach(function(l,i){x.fillText(l,90,210+i*fs*1.35)});
   x.fillStyle='#9fb0d0';font(34);x.fillText('ส่งข่าว · ลุงเล่า',90,W-130);
-  return IMGC[p.hook]=c.toDataURL('image/png');
+  return c.toDataURL('image/png');
 }
 async function doPost(id){
   if(S.posting[id])return;
@@ -361,7 +409,12 @@ async function doPost(id){
   }catch(e){
     var it=find(id);
     if(it){
-      S.post[id]={
+      S.post[id]=it.region==='near'?{
+        kind:'near',hook:'เตือน!! เรื่องใกล้ตัวที่ต้องรู้',pts:[],
+        body:(it.facts||it.title_th||it.title).slice(0,150)+'...',
+        q:'ส่งต่อเตือนคนที่บ้านด้วยนะ',src:it.source||'',
+        tags:['#เตือนภัย','#ต้องรู้','#ข่าวใกล้ตัว','#ส่งข่าว','#เล่าข่าว']
+      }:{
         hook: "เรื่องนี้กำลังมาแรง! 🔥",
         body: (it.facts||it.title_th||it.title).slice(0, 150) + "...",
         q: "คุณคิดว่าเรื่องนี้เป็นยังไงบ้าง? คอมเมนต์มาเลย 👇",
@@ -388,7 +441,7 @@ async function send(text){
   var hist=S.chat.slice(-8);
   S.chat.push({r:'u',t:text});LS.set('sk_chat',S.chat.slice(-30));
   $('#msg').value='';grow();render();
-  var heads=S.news.th.slice(0,6).concat(S.news.world.slice(0,6)).map(function(x){return x.title_th||x.title});
+  var heads=S.news.near.slice(0,4).concat(S.news.th.slice(0,6),S.news.world.slice(0,6)).map(function(x){return x.title_th||x.title});
   try{
     var r=await api('chat',[S.ctx?S.ctx.id:'',text,hist,heads],120000);
     S.chat.push({r:'a',t:r});
@@ -457,14 +510,14 @@ var ACT={
   clrchat:function(){S.chat=[];S.chatErr='';LS.set('sk_chat',[]);render()},
   test:async function(){
     saveCfg();S.tst={t:'กำลังทดสอบ…',c:''};render(true);
-    try{await api('ping',[],30000);S.tst={t:'เชื่อมต่อได้ ✓ โหลดข่าวให้แล้ว ดูที่แท็บไทย/โลก',c:'var(--ok)'};loadNews()}
+    try{await api('ping',[],30000);S.tst={t:'เชื่อมต่อได้ ✓ โหลดข่าวให้แล้ว ดูที่แท็บใกล้ตัว/ไทย/โลก',c:'var(--ok)'};loadNews()}
     catch(e){S.tst={t:e.message,c:'var(--bad)'}}
     render(true);
   },
   wipe:function(){
     if(!S.wipeArm){S.wipeArm=true;render(true);return}
     ['sk_news','sk_saved','sk_chat','sk_tab','sk_re','sk_reUrl'].forEach(function(k){try{localStorage.removeItem(k)}catch(e){}});
-    S.news={th:[],world:[],at:0};S.saved=[];S.chat=[];S.re=[];S.ctx=null;S.wipeArm=false;render();toast('ล้างแล้ว (รหัส API ยังอยู่)');
+    S.news={near:[],th:[],world:[],at:0};S.saved=[];S.chat=[];S.re=[];S.ctx=null;S.wipeArm=false;render();toast('ล้างแล้ว (รหัส API ยังอยู่)');
   }
 };
 function saveCfg(){
