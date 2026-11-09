@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='7.1 · 2026-11-09';
+var VERSION='7.2 · 2026-11-09';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -511,7 +511,7 @@ function imgPromptOf(p){
   return L.join('\n');
 }
 // คำสั่งทำคลิปลุงเล่า: แบ่งสคริปต์ลุงเป็นช่วง ~8 วินาที (Flow/Veo ทำได้คลิปละ 8 วิ) · บทพูดไทยมาจากที่ลุงเล่าตรง ๆ
-var VCHAR_DEF='the same elderly Thai man as in the attached image, with the same face, hair and clothing';
+var VCHAR_DEF='the same elderly Thai man as in the attached image, with the same face, hair and clothing. He is an original fictional character created for this channel, an ordinary generic person, not a real, famous or public person';
 function vidSegs(t){
   var words=String(t||'').replace(/\s+/g,' ').trim().split(' '),out=[],cur='';
   words.forEach(function(w){
