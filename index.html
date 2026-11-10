@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='7.3 · 2026-11-09';
+var VERSION='7.4 · 2026-11-10';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -141,7 +141,7 @@ var S={
   saved:LS.get('sk_saved',[]),
   chat:LS.get('sk_chat',[]),
   ctx:null,tst:{t:'',c:''},busy:0,open:{},retelling:{},posting:{},post:LS.get('sk_post',{}),loading:false,sending:false,chatErr:'',wipeArm:false,reLoading:false,delArm:'',vidOpen:{},vgreen:LS.get('sk_vgreen',true),
-  vchar:LS.get('sk_vchar','')
+  vchar:LS.get('sk_vchar',''),csafe:LS.get('sk_csafe',{}),safing:{}
 };
 // หมวดในแท็บข่าว (เลื่อนซ้ายขวาได้)
 var CATS=[['th','ดราม่าไทย'],['alert','เตือนภัย'],['welfare','สวัสดิการ'],['econ','เศรษฐกิจ'],['protest','ชุมนุม'],['ent','บันเทิง'],['world','ต่างประเทศ'],['page','จากเพจ']];
@@ -349,6 +349,9 @@ function setHtml(){
   '<div class="acts" style="margin:0 0 6px"><button class="btn pri" data-act="test">ทดสอบการเชื่อมต่อ</button></div><div class="note" id="tst" style="margin:0 4px 16px;color:'+(S.tst.c||'var(--mut)')+'">'+esc(S.tst.t)+'</div>'+
   '<div class="card pad"><div class="h2">ลุงใช้ Gemini</div><div class="hint">ข่าวที่ลุงเล่าแล้วเก็บไว้ในชีตและในเครื่อง เปิดอ่านได้แม้ไม่ได้ใช้ Claude ส่วนแชทต้องใช้ Gemini ผ่านหลังบ้าน</div></div>'+
   '<div class="card pad"><div class="h2">ตัวละครคนเล่า (คำสั่งทำคลิป)</div><div class="hint" style="margin-bottom:8px">บรรยายหน้าตา/การแต่งตัว/ฉากของลุงเป็นภาษาอังกฤษ ปล่อยว่างจะใช้ค่าเริ่มต้น และควรแนบภาพลุงไปกับทุกคลิปให้หน้าเหมือนเดิม</div><textarea id="vchar" rows="4" placeholder="'+esc(VCHAR_DEF)+'" style="font-size:16px;width:100%;padding:8px;border:1px solid #ccc;border-radius:8px">'+esc(S.vchar)+'</textarea><label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:15px"><input type="checkbox" id="vgreen" '+(S.vgreen?'checked':'')+' style="width:22px;height:22px"> ภาพลุงเป็นฉากเขียว (ให้คลิปคงพื้นเขียวไว้ลบใน CapCut)</label></div>'+
+  '<div class="card pad"><div class="h2">ลุงประจำหมวด (ทำครั้งเดียว)</div><div class="hint" style="margin-bottom:8px">กดคัดลอก → เปิด Gemini → แนบภาพลุงปัจจุบัน → วาง → บันทึกภาพไว้อัลบั้ม "ลุง" · หน้าเดิม เปลี่ยนแค่ชุด · ตอนทำคลิปแอปจะบอกว่าข่าวนี้ใช้ชุดไหน</div><div class="acts" style="flex-wrap:wrap">'+
+    Object.keys(OUTFIT).map(function(c){return '<button class="btn" data-act="coutfit" data-c="'+c+'">ชุด'+OUTFIT[c][0]+'</button>'}).join('')+
+    '<button class="btn" data-act="csheet">Character Sheet (ภาพหลายมุมไว้อ้างอิง)</button></div></div>'+
   '<div class="card pad"><div class="h2">เครื่องมือ</div><div class="acts"><button class="btn" data-act="size">เช็คพื้นที่เครื่อง</button><button class="btn" data-act="hist">ดูประวัติโพสต์ ('+Object.keys(S.post).length+')</button></div><div class="note" id="sizeOut" style="margin-top:10px;color:var(--mut)"></div></div>'+
   '<div class="card pad"><div class="h2">ข้อมูลในเครื่อง</div><div class="hint" style="margin-bottom:10px">ข่าวที่เก็บไว้ '+S.saved.length+' · ข้อความแชท '+S.chat.length+'</div><button class="btn" data-act="wipe">'+(S.wipeArm?'แตะอีกครั้งเพื่อยืนยันล้าง':'ล้างข้อมูลในเครื่อง')+'</button></div>'+
   '<div class="note" style="text-align:center">ส่งข่าว · เวอร์ชัน '+VERSION+'</div>';
@@ -512,6 +515,32 @@ function imgPromptOf(p){
 }
 // คำสั่งทำคลิปลุงเล่า: แบ่งสคริปต์ลุงเป็นช่วง ~8 วินาที (Flow/Veo ทำได้คลิปละ 8 วิ) · บทพูดไทยมาจากที่ลุงเล่าตรง ๆ
 var VCHAR_DEF='the same elderly Thai man as in the attached image, with the same face, hair and clothing. He is an original fictional character created for this channel, an ordinary generic person, not a real, famous or public person';
+// ลุงชุดประจำหมวด: หน้า/ผม/อายุเดิม เปลี่ยนแค่เสื้อผ้า+ของถือ · ห้ามสีเขียว (คีย์สีจะกินเสื้อ)
+var OUTFIT={
+  th:['สภากาแฟ','a plain light-blue short-sleeve shirt, holding a small coffee cup'],
+  alert:['เตือนภัย','a bright orange rain jacket over his shirt, holding a small handheld radio'],
+  welfare:['สวัสดิการ','a neat white collared shirt, holding a plain document folder with no writing'],
+  econ:['เศรษฐกิจ','a light-blue collared shirt and thin reading glasses, holding a folded newspaper with no readable text'],
+  protest:['ชุมนุม','a plain grey polo shirt with no symbols, logos, colors of any group or slogans, hands empty'],
+  ent:['บันเทิง','a casual patterned short-sleeve shirt (no green), holding a small coffee cup'],
+  world:['ต่างประเทศ','a navy-blue collared shirt, holding a small globe or a folded newspaper with no readable text']
+};
+function vcatOf(it){if(it.region==='near')return catOf(it);if(it.region==='world')return 'world';return 'th'}
+var LUNG_FIC='He is an original fictional character created for this channel, an ordinary generic person, not a real, famous or public person.';
+var GREEN_BG='Plain solid bright green chroma-key background, evenly lit, flat, no shadows, no objects. His clothing and props must not contain any green.';
+function sheetPrompt(){
+  return ['Using the attached image of this man as the only reference, create a character reference sheet of exactly the same man: same face, hair, age, skin tone, body shape and outfit.',
+    'Layout: on the left, three full-body views (front, three-quarter side, back). On the right, three head-and-shoulders close-ups (calm smile, serious, concerned).',
+    LUNG_FIC,GREEN_BG,'Even studio lighting. Realistic photo style, the same style as the attached image. No text, no labels, no arrows, no logos.'].join('\n');
+}
+function outfitPrompt(c){
+  var o=OUTFIT[c]||OUTFIT.th;
+  return ['Using the attached image of this man, create one new image of exactly the same man: same face, hair, age, skin tone and body shape. Change only his clothing and what he holds.',
+    'New outfit: '+o[1]+'.',
+    'Keep the same framing and the same pose as the attached image: facing the camera, hands resting together in front (holding the item lightly in front if he has one).',
+    LUNG_FIC,GREEN_BG,'Vertical 9:16. Realistic photo style, the same style as the attached image. No text, no logos, no other people.'].join('\n');
+}
+function clipText(it){return S.csafe[it.id]||it.lung}
 function vidSegs(t){
   var words=String(t||'').replace(/\s+/g,' ').trim().split(' '),out=[],cur='';
   words.forEach(function(w){
@@ -531,9 +560,10 @@ function vidClipPrompt(it,i,segs){
     'No subtitles, no on-screen text, no background music, no other people.'].join('\n');
 }
 function vidHtml(it){
-  var segs=vidSegs(it.lung);
-  return '<div class="lh">คำสั่งทำคลิป · '+segs.length+' คลิป คลิปละ 8 วิ (Flow)</div><div class="note">ตั้ง 9:16 + 8 วินาทีใน Flow · แนบภาพลุงทุกคลิป · กดคัดลอกทีละคลิปแล้ววางได้เลย'+(S.vgreen?' · คลิปคงฉากเขียวไว้ ลบใน CapCut ด้วย \'คีย์สี (Chroma key)\'':'')+'</div>'+
-    segs.map(function(sg,i){return '<div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0"><div class="note" style="margin:0 0 6px">คลิป '+(i+1)+': '+esc(sg)+'</div><button class="btn acc" data-act="cclip" data-id="'+esc(it.id)+'" data-i="'+i+'">คัดลอกคลิป '+(i+1)+'</button></div>'}).join('');
+  var segs=vidSegs(clipText(it)),o=OUTFIT[vcatOf(it)]||OUTFIT.th,safe=!!S.csafe[it.id];
+  var sb=S.safing[it.id]?'<button class="btn" disabled>กำลังเปลี่ยนชื่อเป็นตำแหน่ง…</button>':safe?'<button class="btn" data-act="cunsafe" data-id="'+esc(it.id)+'">ใช้บทไม่มีชื่อคนอยู่ · กลับไปบทเดิม</button>':'<button class="btn" data-act="csafe" data-id="'+esc(it.id)+'">Flow บล็อก? เปลี่ยนชื่อคนเป็นตำแหน่ง</button>';
+  return '<div class="lh">คำสั่งทำคลิป · '+segs.length+' คลิป คลิปละ 8 วิ (Flow)</div><div class="note" style="font-weight:600">แนบภาพลุงชุด "'+o[0]+'" ทุกคลิป <span style="font-weight:400">(ทำภาพชุดได้ที่ ตั้งค่า → ลุงประจำหมวด)</span></div><div class="note">ตั้ง 9:16 + 8 วินาทีใน Flow · กดคัดลอกทีละคลิปแล้ววางได้เลย'+(S.vgreen?' · คลิปคงฉากเขียวไว้ ลบใน CapCut ด้วย \'คีย์สี (Chroma key)\'':'')+'</div>'+
+    segs.map(function(sg,i){return '<div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0"><div class="note" style="margin:0 0 6px">คลิป '+(i+1)+': '+esc(sg)+'</div><button class="btn acc" data-act="cclip" data-id="'+esc(it.id)+'" data-i="'+i+'">คัดลอกคลิป '+(i+1)+'</button></div>'}).join('')+'<div class="acts" style="margin-top:6px">'+sb+'</div>';
 }
 // แบบที่ 2: ฉากจริงเป็นพื้นหลัง + คนในข่าวจากรูปที่ผู้ใช้แนบ (สไตล์เพจข่าวไวรัล) · ตัวหนังสือวางแบบเดิม · ไม่ให้ AI ปั้นหน้าคนจริงเอง
 function imgStoryPromptOf(p){
@@ -614,6 +644,17 @@ async function doPost(id){
   LS.set('sk_post',S.post);
   delete S.posting[id];render(true);
 }
+async function doSafe(id){
+  var it=find(id);if(!it||!it.lung||S.safing[id])return;
+  S.safing[id]=1;render(true);
+  try{
+    var t=String(await api('clipSafe',[it.lung,it.title_th||it.title,it.facts||''],90000)||'').trim();
+    if(!t)throw new Error('ได้บทว่างกลับมา ลองใหม่');
+    if(t===it.lung)toast('บทนี้ไม่มีชื่อคน ลองกดสร้างซ้ำใน Flow อีกรอบ');
+    else{S.csafe[id]=t;var k=Object.keys(S.csafe);if(k.length>40)delete S.csafe[k[0]];LS.set('sk_csafe',S.csafe);toast('เปลี่ยนชื่อเป็นตำแหน่งแล้ว คัดลอกคลิปใหม่ได้เลย')}
+  }catch(e){toast(e.message)}
+  delete S.safing[id];render(true);
+}
 async function doRetell(id){
   if(S.retelling[id])return;
   S.retelling[id]=1;render(true);
@@ -645,7 +686,11 @@ var ACT={
   retell:function(id){doRetell(id)},
   post:function(id){doPost(id)},
   cvid:function(id){S.vidOpen[id]=!S.vidOpen[id];render(true)},
-  cclip:function(id,btn){var it=find(id);if(!it||!it.lung)return;var segs=vidSegs(it.lung),i=+btn.getAttribute('data-i');
+  csafe:function(id){doSafe(id)},
+  cunsafe:function(id){delete S.csafe[id];LS.set('sk_csafe',S.csafe);render(true);toast('กลับไปใช้บทเดิมแล้ว')},
+  csheet:function(id,btn){clip(sheetPrompt()).then(function(){toast('คัดลอกแล้ว แนบภาพลุงปัจจุบัน แล้ววางใน Gemini')}).catch(function(){toast('คัดลอกไม่ได้')})},
+  coutfit:function(id,btn){var c=btn.getAttribute('data-c');clip(outfitPrompt(c)).then(function(){toast('คัดลอกชุด'+(OUTFIT[c]||OUTFIT.th)[0]+'แล้ว แนบภาพลุงปัจจุบัน แล้ววางใน Gemini')}).catch(function(){toast('คัดลอกไม่ได้')})},
+  cclip:function(id,btn){var it=find(id);if(!it||!it.lung)return;var segs=vidSegs(clipText(it)),i=+btn.getAttribute('data-i');
     clip(vidClipPrompt(it,i,segs)).then(function(){btn.textContent='คัดลอกแล้ว ✓';btn.style.opacity='.6'}).catch(function(){toast('คัดลอกไม่ได้')})},
   delSave:function(id){
     if(S.delArm!==id){S.delArm=id;render(true);return}
