@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='7.5 · 2026-11-11';
+var VERSION='7.6 · 2026-11-11';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -542,13 +542,33 @@ function outfitPrompt(c){
     LUNG_FIC,GREEN_BG,'Vertical 9:16. Realistic photo style, the same style as the attached image. No text, no logos, no other people.'].join('\n');
 }
 function clipText(it){return S.csafe[it.id]||it.lung}
-function vidSegs(t){
-  var words=String(t||'').replace(/\s+/g,' ').trim().split(' '),out=[],cur='';
-  words.forEach(function(w){
-    if(cur&&(cur+' '+w).length>95){out.push(cur);cur=w}else cur=cur?cur+' '+w:w;
+// แบ่งบทเป็นคลิปละ ~8 วิ ให้ยาวใกล้เคียงกันทุกคลิป (กันคลิปท้ายพูดสั้นแล้วมีช่วงว่าง) · ไทยพูด ~11–12 ตัวอักษร/วิ
+var SEG_MAX=95;
+function vidToks(t){
+  var out=[];
+  String(t||'').replace(/\s+/g,' ').trim().split(' ').forEach(function(w){
+    if(!w)return;
+    if(w.length<=40||!window.Intl||!Intl.Segmenter){out.push(w+' ');return}
+    var cur='';Array.from(new Intl.Segmenter('th',{granularity:'word'}).segment(w)).forEach(function(g){
+      if(cur&&(cur+g.segment).length>30){out.push(cur);cur=g.segment}else cur+=g.segment});
+    if(cur)out.push(cur+' ');
   });
-  if(cur){if(out.length&&cur.length<30)out[out.length-1]+=' '+cur;else out.push(cur)}
   return out;
+}
+function vidSegs(t){
+  var toks=vidToks(t);if(!toks.length)return [];
+  var total=toks.join('').length;
+  for(var n=Math.max(1,Math.ceil(total/SEG_MAX));n<=toks.length;n++){
+    var cum=[],c=0;toks.forEach(function(w){c+=w.length;cum.push(c)});
+    var cuts=[],prev=-1,ok=true;
+    for(var k=1;k<n;k++){var goal=total*k/n,best=-1;
+      for(var j=prev+1;j<toks.length-1;j++)if(best<0||Math.abs(cum[j]-goal)<Math.abs(cum[best]-goal))best=j;
+      if(best<0){ok=false;break}cuts.push(best);prev=best}
+    if(!ok)break;
+    var out=[],st=0;cuts.concat([toks.length-1]).forEach(function(e){out.push(toks.slice(st,e+1).join('').trim());st=e+1});
+    if(out.every(function(x){return x.length<=SEG_MAX}))return out;
+  }
+  return [toks.join('').trim()];
 }
 function vidClipPrompt(it,i,segs){
   var n=segs.length,ch=S.vchar||VCHAR_DEF;
@@ -556,7 +576,7 @@ function vidClipPrompt(it,i,segs){
   var ex=it.mood==='serious'?'calm, concerned and respectful expression, gentle voice':(cat==='alert'||cat==='welfare'||cat==='econ'||cat==='agri')?'serious but caring expression, clear firm voice':'lively, warm expression with a slight knowing smile, expressive voice';
   var bgl=S.vgreen?'Keep the plain, solid bright green chroma-key background exactly as in the attached image: evenly lit, flat, no shadows, no objects, no color change, so it can be removed later.':'';
   return ['Vertical 9:16 video, 8 seconds. Use the attached image as the presenter (keep the same face and outfit): '+ch+'.'+(bgl?' '+bgl:''),
-    'He looks straight into the camera and speaks Thai naturally with accurate lip-sync, '+ex+', small natural hand gestures kept close to the body. Medium shot, static camera, soft even light. He starts and ends in the same neutral pose as the attached image (facing the camera, hands resting together in front), so clips can be joined smoothly. He starts speaking immediately with no pause and stops right at the end.'+(i===n-1?' He ends with a small nod.':''),
+    'He looks straight into the camera and speaks Thai naturally with accurate lip-sync, '+ex+', small natural hand gestures kept close to the body. Medium shot, static camera, soft even light. He starts and ends in the same neutral pose as the attached image (facing the camera, hands resting together in front), so clips can be joined smoothly. He starts speaking immediately with no pause, at a calm, unhurried pace so the line fills almost the whole 8 seconds. Right after the last word he returns to the neutral pose and holds still.'+(i===n-1?' He ends with a small nod.':''),
     'He says in Thai: "'+segs[i]+'"',
     'No subtitles, no on-screen text, no background music, no other people.'].join('\n');
 }
