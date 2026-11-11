@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='7.4 · 2026-11-10';
+var VERSION='7.5 · 2026-11-11';
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -144,9 +144,9 @@ var S={
   vchar:LS.get('sk_vchar',''),csafe:LS.get('sk_csafe',{}),safing:{}
 };
 // หมวดในแท็บข่าว (เลื่อนซ้ายขวาได้)
-var CATS=[['th','ดราม่าไทย'],['alert','เตือนภัย'],['welfare','สวัสดิการ'],['econ','เศรษฐกิจ'],['protest','ชุมนุม'],['ent','บันเทิง'],['world','ต่างประเทศ'],['page','จากเพจ']];
+var CATS=[['agri','เกษตร'],['th','ดราม่าไทย'],['alert','เตือนภัย'],['welfare','สวัสดิการ'],['econ','เศรษฐกิจ'],['protest','ชุมนุม'],['ent','บันเทิง'],['world','ต่างประเทศ'],['page','จากเพจ']];
 var CATL={};CATS.forEach(function(c){CATL[c[0]]=c[1]});
-var NEAR_C={alert:1,welfare:1,econ:1,protest:1,ent:1};
+var NEAR_C={agri:1,alert:1,welfare:1,econ:1,protest:1,ent:1};
 if(S.tab==='th'||S.tab==='world'||S.tab==='near'){S.cat=S.tab==='near'?'alert':S.tab;S.tab='news'}
 if(!TABS[S.tab]||S.tab==='chat'||S.tab==='re')S.tab='news';
 if(!CATL[S.cat])S.cat='th';
@@ -490,7 +490,7 @@ function imgPromptOf(p){
   var h=hashStr(p.head+'|'+p.sub),list=al?PAL.alert:PAL.other,pal=list[h%list.length];
   var bg=pal[0],acc=pal[1],side=(h>>3)%2?'right':'left',other=side==='left'?'right':'left';
   var mood=al?'urgent breaking news warning':'vibrant Thai breaking news';
-  var vis=p.visual||({alert:'dark storm clouds with heavy rain, lightning and a warning sign',welfare:'a smartphone and a stylized welfare card with gold coins',econ:'stacks of coins, banknotes and a rising price arrow'}[p.cat])||'a smartphone with news icons';
+  var vis=p.visual||({alert:'dark storm clouds with heavy rain, lightning and a warning sign',welfare:'a smartphone and a stylized welfare card with gold coins',agri:'sugarcane stalks, rice sheaves and a sack of sugar in a sunny Thai field',econ:'stacks of coins, banknotes and a rising price arrow'}[p.cat])||'a smartphone with news icons';
   var decor=p.decor||(al?'faint rain streaks, a soft lightning glow and blurred rising water':'warm bokeh lights and a few blurred gold coins');
   var scene=p.scene?(' with '+p.scene):'';
   var L=[],n=1;
@@ -517,6 +517,7 @@ function imgPromptOf(p){
 var VCHAR_DEF='the same elderly Thai man as in the attached image, with the same face, hair and clothing. He is an original fictional character created for this channel, an ordinary generic person, not a real, famous or public person';
 // ลุงชุดประจำหมวด: หน้า/ผม/อายุเดิม เปลี่ยนแค่เสื้อผ้า+ของถือ · ห้ามสีเขียว (คีย์สีจะกินเสื้อ)
 var OUTFIT={
+  agri:['เกษตร','a faded indigo-blue Thai farmer shirt (mor hom) and a loincloth scarf (pha khao ma) in red and white check around the waist, holding a woven straw hat'],
   th:['สภากาแฟ','a plain light-blue short-sleeve shirt, holding a small coffee cup'],
   alert:['เตือนภัย','a bright orange rain jacket over his shirt, holding a small handheld radio'],
   welfare:['สวัสดิการ','a neat white collared shirt, holding a plain document folder with no writing'],
@@ -552,7 +553,7 @@ function vidSegs(t){
 function vidClipPrompt(it,i,segs){
   var n=segs.length,ch=S.vchar||VCHAR_DEF;
   var cat=it.region==='near'?catOf(it):'';
-  var ex=it.mood==='serious'?'calm, concerned and respectful expression, gentle voice':(cat==='alert'||cat==='welfare'||cat==='econ')?'serious but caring expression, clear firm voice':'lively, warm expression with a slight knowing smile, expressive voice';
+  var ex=it.mood==='serious'?'calm, concerned and respectful expression, gentle voice':(cat==='alert'||cat==='welfare'||cat==='econ'||cat==='agri')?'serious but caring expression, clear firm voice':'lively, warm expression with a slight knowing smile, expressive voice';
   var bgl=S.vgreen?'Keep the plain, solid bright green chroma-key background exactly as in the attached image: evenly lit, flat, no shadows, no objects, no color change, so it can be removed later.':'';
   return ['Vertical 9:16 video, 8 seconds. Use the attached image as the presenter (keep the same face and outfit): '+ch+'.'+(bgl?' '+bgl:''),
     'He looks straight into the camera and speaks Thai naturally with accurate lip-sync, '+ex+', small natural hand gestures kept close to the body. Medium shot, static camera, soft even light. He starts and ends in the same neutral pose as the attached image (facing the camera, hands resting together in front), so clips can be joined smoothly. He starts speaking immediately with no pause and stops right at the end.'+(i===n-1?' He ends with a small nod.':''),
@@ -625,7 +626,7 @@ async function doPost(id){
   }catch(e){
     var it=find(id);
     if(it){
-      S.post[id]=(it.region==='near'&&/^(alert|welfare|econ)$/.test(catOf(it)))?{
+      S.post[id]=(it.region==='near'&&/^(alert|welfare|econ|agri)$/.test(catOf(it)))?{
         kind:'near',hook:'เตือน!! เรื่องใกล้ตัวที่ต้องรู้',pts:[],
         body:(it.facts||it.title_th||it.title).slice(0,150)+'...',
         q:'ส่งต่อเตือนคนที่บ้านด้วยนะ',src:it.source||'',
