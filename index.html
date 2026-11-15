@@ -122,7 +122,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='8.1 · 2026-11-15';
+var VERSION='8.2 · 2026-11-15';
 var CLIP=false; // ปิดลุงเล่า+คำสั่งทำคลิป (ผู้ใช้ไม่ว่างทำคลิป 2026-11-15) เปลี่ยนเป็น true เพื่อเปิดกลับ
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
@@ -297,8 +297,7 @@ function itemHtml(it,i,hot){
       if(!S.posting[it.id])b+='<button class="btn acc" data-act="post" data-id="'+esc(it.id)+'">'+(S.post[it.id]?'ทำโพสต์ใหม่':'สร้างโพสต์')+'</button>';
       if(S.post[it.id])b+='<button class="btn" data-act="cpost" data-id="'+esc(it.id)+'">คัดลอกโพสต์</button>';
       if(S.post[it.id]&&S.post[it.id].head){
-        b+='<button class="btn acc" data-act="cimg" data-id="'+esc(it.id)+'">คัดลอกคำสั่งสร้างภาพ</button>';
-        b+='<button class="btn acc" data-act="cimg2" data-id="'+esc(it.id)+'">คำสั่งภาพ: ฉากจริง'+(S.post[it.id].person?' + คนในข่าว':'')+'</button>';
+        b+='<button class="btn acc" data-act="cbg" data-id="'+esc(it.id)+'">คัดลอกคำสั่งภาพพื้นหลัง (Gemini)</button>';
       }
       if(CLIP&&it.lung)b+='<button class="btn acc" data-act="cvid" data-id="'+esc(it.id)+'">'+(S.vidOpen[it.id]?'ซ่อนคำสั่งทำคลิป':'คำสั่งทำคลิป')+'</button>';
       if(CLIP)b+='<button class="btn pri" data-act="ask" data-id="'+esc(it.id)+'">ถามลุง</button>';
@@ -542,6 +541,21 @@ function vidHtml(it){
     segs.map(function(sg,i){return '<div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0"><div class="note" style="margin:0 0 6px">คลิป '+(i+1)+': '+esc(sg)+'</div><button class="btn acc" data-act="cclip" data-id="'+esc(it.id)+'" data-i="'+i+'">คัดลอกคลิป '+(i+1)+'</button></div>'}).join('')+'<div class="acts" style="margin-top:6px">'+sb+'</div>';
 }
 // แบบที่ 2: ฉากจริงเป็นพื้นหลัง + คนในข่าวจากรูปที่ผู้ใช้แนบ (สไตล์เพจข่าวไวรัล) · ตัวหนังสือวางแบบเดิม · ไม่ให้ AI ปั้นหน้าคนจริงเอง
+// คำสั่งให้ Gemini ทำ "ภาพพื้นหลังอย่างเดียว ไม่มีตัวหนังสือ" แล้วแอปวาดตัวหนังสือไทยทับเอง (AI เขียนไทยผิดบ่อย)
+function bgPromptOf(p,it){
+  var serious=p.mood==='serious',al=p.cat==='alert';
+  var subj=p.place||p.scene||p.visual||({alert:'heavy rain and storm clouds over a Thai town, wet streets',welfare:'a Thai government service counter or a local market with shoppers',econ:'a busy Thai market with price tags and shoppers',agri:'a wide Thai sugarcane or rice field',protest:'a city street in Bangkok with a crowd seen from far away',ent:'a stage with colorful concert lights',world:'a city skyline at dusk',th:'a busy street scene in Bangkok'}[p.cat])||'a street scene in Thailand';
+  var L=[];
+  L.push('Create a vertical 4:5 (1080x1350) photorealistic background image for a Thai news Facebook post.');
+  L.push('Story (for context only, do not write it in the image): '+(it?(it.title_th||it.title):p.hook)+(p.sub?' — '+p.sub:''));
+  L.push('Scene: '+subj+(p.scene&&p.scene!==subj?', with '+p.scene:'')+'. Make it look like a real news photo taken in Thailand: natural light, realistic details, shallow depth of field.');
+  L.push('If I attach a photo, use it as the reference for the place, objects and mood, and recreate a similar scene in the same style. Do not copy any logos, watermarks or text from the photo.');
+  L.push('Composition: keep the important subject in the lower-middle area. The top third and the very bottom should be calmer and slightly darker (sky, wall, blur) because large text will be placed on top later.');
+  L.push('Mood: '+(serious?'calm, respectful, muted colors.':al?'dramatic and urgent, stormy or tense atmosphere, strong contrast.':'vivid, eye-catching, rich colors, cinematic lighting.'));
+  L.push('Absolutely no text, letters, numbers, signs with writing, captions, logos or watermarks anywhere in the image.');
+  L.push('No recognizable real people or faces. If people are needed, show them from behind, far away, or blurred.');
+  return L.join('\n');
+}
 function imgStoryPromptOf(p){
   var al=p.cat==='alert';
   var place=p.place||p.scene||'a Thai street scene related to the story';
@@ -678,7 +692,7 @@ function postImgCard(p,bg){
   B.forEach(function(b){b.y=y;if(b.foc)fy=y+b.h/2;y+=b.h+gap});
   // พื้นหลัง: ไล่สี + แฉกแสง + จุดฮาล์ฟโทน + ขอบมืด
   if(bg){var sc=Math.max(W/bg.width,H/bg.height),w0=bg.width*sc,h0=bg.height*sc;x.drawImage(bg,(W-w0)/2,(H-h0)/2,w0,h0);
-    var og=x.createLinearGradient(0,0,0,H);og.addColorStop(0,rgba(D,.8));og.addColorStop(.5,rgba(D,.5));og.addColorStop(1,rgba(D,.84));x.fillStyle=og;x.fillRect(0,0,W,H)}else{
+    var og=x.createLinearGradient(0,0,0,H);og.addColorStop(0,rgba(D,.72));og.addColorStop(.35,rgba(D,.38));og.addColorStop(.62,rgba(D,.22));og.addColorStop(1,rgba(D,.8));x.fillStyle=og;x.fillRect(0,0,W,H)}else{
   var g=x.createLinearGradient(0,0,W*.35,H);g.addColorStop(0,D);g.addColorStop(.48,M);g.addColorStop(1,D);x.fillStyle=g;x.fillRect(0,0,W,H);
   if(!serious){x.save();x.translate(W/2,fy);x.fillStyle='rgba(255,255,255,.05)';for(var a=0;a<24;a++){x.rotate(Math.PI/12);x.beginPath();x.moveTo(0,0);x.lineTo(1700,-110);x.lineTo(1700,110);x.closePath();x.fill()}x.restore()}
   var rg=x.createRadialGradient(W/2,fy,30,W/2,fy,640);rg.addColorStop(0,'rgba(255,255,255,.22)');rg.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=rg;x.fillRect(0,0,W,H);
@@ -784,6 +798,7 @@ var ACT={
     if(S.delArm!=='__done'){S.delArm='__done';render(true);return}
     S.saved=S.saved.filter(function(x){return x.status!=='done'});S.delArm='';LS.set('sk_saved',S.saved);render(true);toast('ลบข่าวที่โพสต์แล้วเรียบร้อย');
   },
+  cbg:function(id,btn){var p=S.post[id];if(!p)return;clip(bgPromptOf(p,find(id))).then(function(){btn.textContent='คัดลอกแล้ว ✓ ไปวางใน Gemini';setTimeout(function(){btn.textContent='คัดลอกคำสั่งภาพพื้นหลัง (Gemini)'},2500);toast('วางใน Gemini (แนบรูปข่าวเป็นแบบได้) แล้วบันทึกภาพ กลับมากด "ใส่ภาพจริงเป็นพื้นหลัง"')},function(){toast('คัดลอกไม่ได้')})},
   cimg2:function(id,btn){var p=S.post[id];if(!p||!p.head)return;clip(imgStoryPromptOf(p)).then(function(){
     toast(p.person?'คัดลอกแล้ว แนบรูป '+p.person+' จากเว็บทางการ/แถลงข่าว ไปพร้อมคำสั่งด้วย':'คัดลอกแล้ว ไปวางใน Gemini/ChatGPT');
   }).catch(function(){toast('คัดลอกไม่ได้')})},
