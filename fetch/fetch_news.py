@@ -149,8 +149,6 @@ SOURCES = [
     ("trends-GB", lambda: trends("GB", "world", "อังกฤษ")),
     ("trends-IN", lambda: trends("IN", "world", "อินเดีย")),
     ("trends-AU", lambda: trends("AU", "world", "ออสเตรเลีย")),
-    ("reddit-worldnews", lambda: reddit("worldnews", "world")),
-    ("reddit-news", lambda: reddit("news", "world")),
 ]
 
 
@@ -229,19 +227,14 @@ SOURCES.append(("tmd-cap", tmd_cap))
 
 
 RSS_TH = [
-    ("thairath", "https://www.thairath.co.th/rss/news", "ไทยรัฐ"),
     ("khaosod", "https://www.khaosod.co.th/feed", "ข่าวสด"),
     ("matichon", "https://www.matichon.co.th/feed", "มติชน"),
-    ("dailynews", "https://www.dailynews.co.th/feed/", "เดลินิวส์"),
-    ("mthai", "https://news.mthai.com/feed", "MThai"),
-    ("sanook", "https://www.sanook.com/news/rss/", "Sanook"),
 ]
 RSS_WORLD = [
     ("bbc", "https://feeds.bbci.co.uk/news/world/rss.xml", "BBC News"),
     ("guardian", "https://www.theguardian.com/world/rss", "The Guardian"),
     ("aljazeera", "https://www.aljazeera.com/xml/rss/all.xml", "Al Jazeera"),
     ("npr", "https://feeds.npr.org/1004/rss.xml", "NPR"),
-    ("dw", "https://rss.dw.com/rdf/rss-en-all", "DW"),
 ]
 SOURCES += [("rss-" + n, (lambda u=u, l=l: rss(u, "th", l))) for n, u, l in RSS_TH]
 SOURCES += [("rss-" + n, (lambda u=u, l=l: rss(u, "world", l))) for n, u, l in RSS_WORLD]

@@ -118,10 +118,11 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 </div>
 <div id="comp"><textarea id="msg" rows="1" placeholder="ถามลุงเรื่องข่าว…"></textarea><button id="snd">ส่ง</button></div>
 <div id="toast"></div>
+<input type="file" id="bgf" accept="image/*" style="position:fixed;left:-9999px;top:0" tabindex="-1">
 <script>
 (function(){
 'use strict';
-var VERSION='8.0 · 2026-11-15';
+var VERSION='8.1 · 2026-11-15';
 var CLIP=false; // ปิดลุงเล่า+คำสั่งทำคลิป (ผู้ใช้ไม่ว่างทำคลิป 2026-11-15) เปลี่ยนเป็น true เพื่อเปิดกลับ
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
@@ -153,10 +154,32 @@ if(!TABS[S.tab]||S.tab==='chat'||S.tab==='re')S.tab='news';
 if(!CATL[S.cat])S.cat='th';
 if(!S.news.near)S.news.near=[];
 function catOf(it){var t=String(it.tag||'');if(NEAR_C[t])return t;if(/สิทธิ|สปสช/.test(t))return 'welfare';return 'alert'}
+// ตัดข่าวซ้ำ: หัวข้อเหมือน/คล้ายกันเก็บไว้อันเดียว เลือกแหล่งตามลำดับ ทางการ > สำนักข่าวตรง > Google News > Facebook
+function nkey(t){return String(t||'').replace(/\s[-–|]\s[^-–|]{2,30}$/,'').replace(/[^\u0E00-\u0E7Fa-zA-Z0-9]/g,'').toLowerCase().slice(0,70)}
+function srcRank(it){var u=it.url||'',n=it.source||'';if(/อุตุ|ปภ\.|กรม|กระทรวง|สำนักงาน|ศูนย์/.test(n))return 0;if(/facebook\.com/.test(u)||/^Facebook/.test(n))return 3;if(/news\.google\.com/.test(u))return 2;return 1}
+function grams(k){var o={},n=0;for(var i=0;i<k.length-1;i++){var g=k.substr(i,2);if(!o[g]){o[g]=1;n++}}o._n=n;return o}
+function sameNews(a,b){
+  if(!a._k){a._k=nkey(a.title);a._g=grams(a._k)}if(!b._k){b._k=nkey(b.title);b._g=grams(b._k)}
+  var s=a._k.length<b._k.length?a._k:b._k,l=s===a._k?b._k:a._k;
+  if(s.length<12)return s===l;if(l.indexOf(s.slice(0,22))>=0)return true;
+  var c=0;for(var g in a._g)if(g!=='_n'&&b._g[g])c++;
+  return c/(a._g._n+b._g._n-c)>=.55;
+}
+function dedup(list){
+  var out=[];
+  list.forEach(function(it){
+    for(var i=0;i<out.length;i++)if(sameNews(out[i],it)){if(srcRank(it)<srcRank(out[i]))out[i]=it;return}
+    out.push(it);
+  });
+  return out;
+}
+var DDC={};
 function catList(c){
-  if(c==='th'||c==='world')return S.news[c]||[];
   if(c==='page')return S.pg;
-  return S.news.near.filter(function(x){return catOf(x)===c});
+  var k=c+'|'+(S.news.at||0)+'|'+(S.news.near||[]).length+'|'+(S.news.th||[]).length;
+  if(DDC[c]&&DDC[c].k===k)return DDC[c].v;
+  var v=dedup((c==='th'||c==='world')?(S.news[c]||[]):S.news.near.filter(function(x){return catOf(x)===c}));
+  DDC[c]={k:k,v:v};return v;
 }
 
 function cfg(){var c=LS.get('sk_cfg',{});return {url:c.url||DEFAULT_URL,key:c.key||''}}
@@ -259,11 +282,11 @@ function itemHtml(it,i,hot){
   if(op){
     var fx=it.facts?'<div class="lh">ข่าวย่อ (สรุปจากแหล่งข่าว)</div><div class="facts">'+esc(it.facts)+'</div>':'';
     if(S.retelling[it.id])b+=fx+'<div class="load">ลุงกำลังค้นข่าวและเล่า…</div>';
-    else if(it.lung)b+=fx+'<div class="lh">ลุงเล่า</div><div class="lung">'+esc(it.lung)+'</div>';
-    else b+=fx+'<div class="note">ลุงยังไม่ได้เล่าข่าวนี้</div>';
+    else if(CLIP&&it.lung)b+=fx+'<div class="lh">ลุงเล่า</div><div class="lung">'+esc(it.lung)+'</div>';
+    else b+=fx||(CLIP?'<div class="note">ลุงยังไม่ได้เล่าข่าวนี้</div>':'');
     var link=/^https?:\/\//.test(it.url||'')?' · <a href="'+esc(it.url)+'" target="_blank" rel="noopener">อ่านต้นฉบับ</a>':'';
-    if(S.posting[it.id])b+='<div class="load">ลุงกำลังเรียบเรียงโพสต์…</div>';
-    else if(S.post[it.id]){var p=S.post[it.id];b+='<div class="lh">โพสต์ที่ลุงร่างให้</div><div class="lung">'+esc(postText(p))+'</div><img class="pimg" src="'+postImg(p)+'" alt="การ์ดภาพ"><div class="note">กดค้างที่ภาพเพื่อบันทึก แล้วโพสต์ลงเฟซบุ๊กได้เลย</div>'}
+    if(S.posting[it.id])b+='<div class="load">กำลังทำโพสต์…</div>';
+    else if(S.post[it.id]){var p=S.post[it.id];b+='<div class="lh">โพสต์</div><div class="lung">'+esc(postText(p))+'</div><img class="pimg" src="'+postImg(p,it)+'" alt="การ์ดภาพ"><div class="note">กดค้างที่ภาพเพื่อบันทึก แล้วโพสต์ลงเฟซบุ๊กได้เลย</div><div class="acts" style="margin:6px 0 10px"><button class="btn acc" data-act="bg" data-id="'+esc(it.id)+'">'+(BG[it.id]?'เปลี่ยนภาพพื้นหลัง':'ใส่ภาพจริงเป็นพื้นหลัง')+'</button>'+(BG[it.id]?'<button class="btn" data-act="bgx" data-id="'+esc(it.id)+'">เอาภาพออก</button>':'')+'</div>'}
     if(S.vidOpen[it.id]&&it.lung)b+=vidHtml(it);
     b+='<div class="note">ที่มา: '+esc(it.source||'-')+link+'</div><div class="acts">';
     
@@ -278,15 +301,11 @@ function itemHtml(it,i,hot){
         b+='<button class="btn acc" data-act="cimg2" data-id="'+esc(it.id)+'">คำสั่งภาพ: ฉากจริง'+(S.post[it.id].person?' + คนในข่าว':'')+'</button>';
       }
       if(CLIP&&it.lung)b+='<button class="btn acc" data-act="cvid" data-id="'+esc(it.id)+'">'+(S.vidOpen[it.id]?'ซ่อนคำสั่งทำคลิป':'คำสั่งทำคลิป')+'</button>';
-      b+='<button class="btn pri" data-act="ask" data-id="'+esc(it.id)+'">ถามลุง</button>';
+      if(CLIP)b+='<button class="btn pri" data-act="ask" data-id="'+esc(it.id)+'">ถามลุง</button>';
     }
     
     b+='<button class="btn" data-act="copy" data-id="'+esc(it.id)+'">คัดลอก</button>';
     
-    // ปุ่มหาคลิป TikTok
-    var tq = encodeURIComponent((it.title_th || it.title || '').trim());
-    b+='<a class="btn" href="https://www.tiktok.com/search?q='+tq+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">🎬 หาคลิป TikTok</a>';
-
     b+='<button class="btn'+(isSaved(it.id)?' on':'')+'" data-act="save" data-id="'+esc(it.id)+'">'+(isSaved(it.id)?'เก็บแล้ว ✓':'เก็บไว้')+'</button></div>';
     b='<div class="nb">'+b+'</div>';
   }
@@ -321,7 +340,7 @@ function listHtml(list,mode){
       }).join('');
       html += '<div style="padding: 0 14px 14px 14px; border-top: 1px dashed var(--line); margin-top:10px">';
       html += '<select data-act="status" data-id="'+esc(it.id)+'" style="font-size:16px; padding:4px; border-radius:6px; border:1px solid #ccc; margin-bottom:6px; width:100%">'+statusOpts+'</select>';
-      html += '<input type="text" data-act="note" data-id="'+esc(it.id)+'" value="'+esc(it.note||'')+'" placeholder="เพิ่มโน้ต (เช่น ทำคลิปตอนเย็น)..." style="font-size:16px; padding:8px; width:100%; border:1px solid #ccc; border-radius:6px;">';
+      html += '<input type="text" data-act="note" data-id="'+esc(it.id)+'" value="'+esc(it.note||'')+'" placeholder="เพิ่มโน้ต (เช่น โพสต์ตอนเย็น)..." style="font-size:16px; padding:8px; width:100%; border:1px solid #ccc; border-radius:6px;">';
       html += '<div class="acts" style="margin-top:8px"><button class="btn" data-act="delSave" data-id="'+esc(it.id)+'" style="'+(S.delArm===it.id?'background:#e3131b;color:#fff':'')+'">'+(S.delArm===it.id?'แตะอีกครั้งเพื่อลบ':'🗑 ลบ')+'</button></div>';
       html += '</div></div>';
       return html;
@@ -348,7 +367,7 @@ function setHtml(){
   var c=cfg();
   return '<div class="card"><div class="row"><label>API URL</label><input id="cu" value="'+esc(c.url)+'" placeholder="https://script.google.com/…" autocapitalize="off" autocorrect="off" spellcheck="false"></div><div class="row"><label>API KEY</label><input id="ck" type="password" value="'+esc(c.key)+'" placeholder="รหัสที่ตั้งไว้" autocapitalize="off" autocorrect="off"></div></div>'+
   '<div class="acts" style="margin:0 0 6px"><button class="btn pri" data-act="test">ทดสอบการเชื่อมต่อ</button></div><div class="note" id="tst" style="margin:0 4px 16px;color:'+(S.tst.c||'var(--mut)')+'">'+esc(S.tst.t)+'</div>'+
-  '<div class="card pad"><div class="h2">ลุงใช้ Gemini</div><div class="hint">ข่าวที่ลุงเล่าแล้วเก็บไว้ในชีตและในเครื่อง เปิดอ่านได้แม้ไม่ได้ใช้ Claude ส่วนแชทต้องใช้ Gemini ผ่านหลังบ้าน</div></div>'+
+  '<div class="card pad"'+(CLIP?'':' style="display:none"')+'><div class="h2">ลุงใช้ Gemini</div><div class="hint">ข่าวที่ลุงเล่าแล้วเก็บไว้ในชีตและในเครื่อง เปิดอ่านได้แม้ไม่ได้ใช้ Claude ส่วนแชทต้องใช้ Gemini ผ่านหลังบ้าน</div></div>'+
   (CLIP?'<div class="card pad"><div class="h2">ตัวละครคนเล่า (คำสั่งทำคลิป)</div><div class="hint" style="margin-bottom:8px">บรรยายหน้าตา/การแต่งตัว/ฉากของลุงเป็นภาษาอังกฤษ ปล่อยว่างจะใช้ค่าเริ่มต้น และควรแนบภาพลุงไปกับทุกคลิปให้หน้าเหมือนเดิม</div><textarea id="vchar" rows="4" placeholder="'+esc(VCHAR_DEF)+'" style="font-size:16px;width:100%;padding:8px;border:1px solid #ccc;border-radius:8px">'+esc(S.vchar)+'</textarea><label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:15px"><input type="checkbox" id="vgreen" '+(S.vgreen?'checked':'')+' style="width:22px;height:22px"> ภาพลุงเป็นฉากเขียว (ให้คลิปคงพื้นเขียวไว้ลบใน CapCut)</label></div>'+
   '<div class="card pad"><div class="h2">ลุงประจำหมวด (ทำครั้งเดียว)</div><div class="hint" style="margin-bottom:8px">กดคัดลอก → เปิด Gemini → แนบภาพลุงปัจจุบัน → วาง → บันทึกภาพไว้อัลบั้ม "ลุง" · หน้าเดิม เปลี่ยนแค่ชุด · ตอนทำคลิปแอปจะบอกว่าข่าวนี้ใช้ชุดไหน</div><div class="acts" style="flex-wrap:wrap">'+
     Object.keys(OUTFIT).map(function(c){return '<button class="btn" data-act="coutfit" data-c="'+c+'">ชุด'+OUTFIT[c][0]+'</button>'}).join('')+
@@ -366,6 +385,7 @@ function catsHtml(){
 function render(keep){
   var p=$('#page'),top=p.scrollTop;
   document.body.setAttribute('data-tab',S.tab);
+  var cb=document.querySelector('nav button[data-tab=chat]');if(cb)cb.style.display=CLIP?'':'none';
   Array.prototype.forEach.call(document.querySelectorAll('nav button'),function(b){b.classList.toggle('on',b.getAttribute('data-tab')===S.tab)});
   $('#ttl').textContent=S.tab==='news'?'ข่าว · '+CATL[S.cat]:TABS[S.tab];
   var n=S.tab==='news'?catList(S.cat).length:0;
@@ -592,7 +612,10 @@ var ICON={
     bub(-18,-22,72,54,'#e3131b',-1,'!');bub(22,22,68,50,'#1250c4',1,'?')}
 };
 function rr(x,a,b,w,h,r){r=Math.min(r,w/2,h/2);x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath()}
-function postImgCard(p){
+var BG={},BGN={};
+function rgba(h,a){return 'rgba('+parseInt(h.slice(1,3),16)+','+parseInt(h.slice(3,5),16)+','+parseInt(h.slice(5,7),16)+','+a+')'}
+function thDate(ts){var d=new Date(Number(ts));if(!ts||isNaN(d))return '';return d.getDate()+' '+['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][d.getMonth()]+' '+String(d.getFullYear()+543).slice(-2)+' เวลา '+hhmm(d.getTime())+' น.'}
+function postImgCard(p,bg){
   var W=1080,H=1350,c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d');
   var cat=CP[p.cat]&&p.cat!=='serious'?p.cat:'th',serious=p.mood==='serious';
   var list=serious?CP.serious:CP[cat],pal=list[hashStr((p.head||p.hook)+'|'+(p.sub||''))%list.length],D=pal[0],M=pal[1],A=pal[2];
@@ -654,22 +677,28 @@ function postImgCard(p){
   var gap=Math.max(14,Math.min(72,(avail-sum)/Math.max(1,B.length-1))),y=top+Math.max(0,(avail-sum-gap*(B.length-1))/2)*.6,fy=H*.42;
   B.forEach(function(b){b.y=y;if(b.foc)fy=y+b.h/2;y+=b.h+gap});
   // พื้นหลัง: ไล่สี + แฉกแสง + จุดฮาล์ฟโทน + ขอบมืด
+  if(bg){var sc=Math.max(W/bg.width,H/bg.height),w0=bg.width*sc,h0=bg.height*sc;x.drawImage(bg,(W-w0)/2,(H-h0)/2,w0,h0);
+    var og=x.createLinearGradient(0,0,0,H);og.addColorStop(0,rgba(D,.8));og.addColorStop(.5,rgba(D,.5));og.addColorStop(1,rgba(D,.84));x.fillStyle=og;x.fillRect(0,0,W,H)}else{
   var g=x.createLinearGradient(0,0,W*.35,H);g.addColorStop(0,D);g.addColorStop(.48,M);g.addColorStop(1,D);x.fillStyle=g;x.fillRect(0,0,W,H);
   if(!serious){x.save();x.translate(W/2,fy);x.fillStyle='rgba(255,255,255,.05)';for(var a=0;a<24;a++){x.rotate(Math.PI/12);x.beginPath();x.moveTo(0,0);x.lineTo(1700,-110);x.lineTo(1700,110);x.closePath();x.fill()}x.restore()}
   var rg=x.createRadialGradient(W/2,fy,30,W/2,fy,640);rg.addColorStop(0,'rgba(255,255,255,.22)');rg.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=rg;x.fillRect(0,0,W,H);
   function dots(ox,oy){for(var gx=-300;gx<=300;gx+=30)for(var gy=-300;gy<=300;gy+=30){var d=Math.sqrt(gx*gx+gy*gy);if(d<300){x.beginPath();x.arc(ox+gx,oy+gy,10*(1-d/300),0,7);x.fill()}}}
   x.fillStyle='rgba(255,255,255,.09)';dots(W-10,330);dots(10,H-330);
   var vg=x.createRadialGradient(W/2,H/2,H*.38,W/2,H/2,H*.78);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.45)');x.fillStyle=vg;x.fillRect(0,0,W,H);
+  }
   B.forEach(function(b){b.draw(b.y)});
   // แถบล่าง: ที่มา + ชื่อเพจ
   x.fillStyle='rgba(0,0,0,.55)';x.fillRect(0,H-96,W,96);x.fillStyle=A;x.fillRect(0,H-96,W,6);
   x.textBaseline='alphabetic';F(900,40);x.textAlign='right';x.fillStyle=A;x.fillText('ส่งข่าว',W-60,H-32);var bwid=x.measureText('ส่งข่าว').width;
-  F(700,32);x.textAlign='left';x.fillStyle='rgba(255,255,255,.88)';var src=p.src?'ที่มา: '+p.src:'';while(src.length>8&&x.measureText(src).width>W-180-bwid)src=src.slice(0,-2);if(src)x.fillText(src,60,H-34);
+  var src=p.src?'ที่มา: '+p.src:'',tm=thDate(p.ts);x.textAlign='left';
+  F(700,tm?30:32);x.fillStyle='rgba(255,255,255,.9)';while(src.length>8&&x.measureText(src).width>W-180-bwid)src=src.slice(0,-2);if(src)x.fillText(src,60,tm?H-50:H-34);
+  if(tm){F(700,25);x.fillStyle='rgba(255,255,255,.7)';x.fillText('อัปเดต '+tm,60,src?H-17:H-34)}
   return c.toDataURL('image/png');
 }
-function postImg(p){
-  var key=[p.cat,p.mood,p.label,p.head,p.sub,p.big,p.pill,p.hook,p.sides,(p.pts||[]).join('|')].join('~');
-  return IMGC[key]||(IMGC[key]=postImgCard(p));
+function postImg(p,it){
+  if(it&&it.ts&&!p.ts)p.ts=it.ts;
+  var id=it?it.id:'',key=[p.cat,p.mood,p.label,p.head,p.sub,p.big,p.pill,p.hook,p.sides,p.ts,BGN[id]||'',(p.pts||[]).join('|')].join('~');
+  return IMGC[key]||(IMGC[key]=postImgCard(p,BG[id]));
 }
 async function doPost(id){
   if(S.posting[id])return;
@@ -760,10 +789,12 @@ var ACT={
   }).catch(function(){toast('คัดลอกไม่ได้')})},
   cimg:function(id,btn){var p=S.post[id];if(!p||!p.head)return;clip(imgPromptOf(p)).then(function(){btn.textContent='คัดลอกแล้ว ✓ ไปวางใน Gemini/ChatGPT';setTimeout(function(){btn.textContent='คัดลอกคำสั่งสร้างภาพ'},2500)}).catch(function(){toast('คัดลอกไม่ได้')})},
   cpost:function(id,btn){var p=S.post[id];if(!p)return;clip(postText(p)).then(function(){btn.textContent='คัดลอกแล้ว ✓';setTimeout(function(){btn.textContent='คัดลอกโพสต์'},1500)},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่ข้อความ')})},
+  bg:function(id){S.bgFor=id;$('#bgf').click()},
+  bgx:function(id){delete BG[id];delete BGN[id];render(true)},
   ask:function(id){var it=find(id);if(!it)return;S.ctx={id:id,title:it.title_th||it.title};S.chatErr='';go('chat')},
   copy:function(id,btn){
     var it=find(id);if(!it)return;
-    var t=(it.lung||it.title_th||it.title)+'\n\n(ที่มา: '+(it.source||'-')+(it.url?' '+it.url:'')+')';
+    var t=((CLIP&&it.lung)||((it.title_th||it.title)+(it.facts?'\n\n'+it.facts:'')))+'\n\n(ที่มา: '+(it.source||'-')+(it.url?' '+it.url:'')+')';
     clip(t).then(function(){btn.textContent='คัดลอกแล้ว ✓';setTimeout(function(){btn.textContent='คัดลอก'},1500)},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่ข้อความ')});
   },
   save:function(id){
@@ -853,6 +884,12 @@ $('#page').addEventListener('input',function(e){
 });
 Array.prototype.forEach.call(document.querySelectorAll('nav button'),function(b){b.addEventListener('click',function(){S.wipeArm=false;go(b.getAttribute('data-tab'))})});
 $('#rf').addEventListener('click',function(){loadNews()});
+$('#bgf').addEventListener('change',function(e){
+  var f=e.target.files[0],id=S.bgFor;e.target.value='';if(!f||!id)return;
+  var u=URL.createObjectURL(f),im=new Image();
+  im.onload=function(){var z=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*z);c.height=Math.round(im.height*z);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);BG[id]=c;BGN[id]=Date.now();render(true)};
+  im.onerror=function(){URL.revokeObjectURL(u);toast('เปิดรูปนี้ไม่ได้ ลองรูปอื่น')};im.src=u;
+});
 $('#snd').addEventListener('click',function(){send($('#msg').value)});
 $('#msg').addEventListener('input',grow);
 
