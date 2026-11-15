@@ -483,6 +483,7 @@ function makeNearPost_(o) {
     '- hook: พาดหัวโพสต์ 1 บรรทัด ไม่เกิน 50 ตัวอักษร (ต่อ label + head + sub ให้เป็นประโยค)\n' +
     '- pts: สรุป 3 ข้อสั้น ข้อละไม่เกิน 70 ตัวอักษร เป็นข้อเท็จจริงที่เอาไปใช้ได้ (ใคร ได้อะไร เมื่อไหร่ ทำยังไง จังหวัดไหน) ' +
     'ห้ามเป็นประโยคทั่วไปอย่าง "ต้องจับตา" "ลุงจะมาเล่าต่อ" ถ้าข้อเท็จจริงมีไม่ถึง 3 ข้อ ให้ส่งน้อยกว่า 3 ข้อ\n' +
+    '- ห้ามซ้ำกัน: ถ้ามี big แล้ว ห้ามใส่ตัวเลขเดียวกันใน head (head = คำหลักอย่างเดียว เช่น "เงินช่วยชาวนา") · ชื่อหน่วยงานเขียนแบบเดียวทั้งโพสต์ (เช่น ธ.ก.ส.) · ทุกข้อต้องจบเป็นคำเต็ม ห้ามตัดกลางคำ\n' +
     '- ตัวเลขกับรายชื่อต้องตรงกัน: ถ้า big เป็นจำนวนสิ่งที่มีชื่อ (จังหวัด อำเภอ ธนาคาร ฯลฯ) pts ต้องไล่ชื่อครบทุกชื่อตามข้อมูล (ใช้ชื่อย่อได้ เช่น สุราษฎร์ฯ นครศรีฯ แบ่งได้หลายข้อ) ' +
     'ถ้าข้อมูลมีชื่อไม่ครบตามจำนวน ห้ามใช้จำนวนนั้นเป็น big (ใช้ตัวเลขอื่นหรือ "") และห้ามเขียนจำนวนนั้นใน head/sub/hook\n' +    '- q: ประโยคชวนคอมเมนต์/ส่งต่อ 1 ประโยค\n- tags: แฮชแท็กไทย 5 อัน ขึ้นต้นด้วย # ไม่มีเว้นวรรค\n' +
     '- visual: ภาษาอังกฤษ 1 วลี บรรยายภาพประกอบ 3D ที่สื่อเรื่องนี้ (สิ่งของ/สัญลักษณ์ ไม่ใช่คน) เช่น "a smartphone showing medical app icons and a gold health card being tapped by a cartoon hand" ห้ามใบหน้าคนจริง ห้ามโลโก้หน่วยงาน ห้ามธงชาติ\n' +
@@ -495,12 +496,12 @@ function makeNearPost_(o) {
   let j;
   try { j = JSON.parse(raw); } catch (e) { throw new Error('ลุงเรียบเรียงไม่สำเร็จ ลองกดใหม่'); }
   const cut = function (v, n) { return String(v || '').trim().slice(0, n); };
-  const pts = (j.pts || []).map(function (t) { return String(t).replace(/^[•\-\s]+/, '').slice(0, 90); })
+  const pts = (j.pts || []).map(function (t) { return String(t).replace(/^[•\-\s]+/, '').slice(0, 160); })
     .filter(function (t) { return t && !/จับตา|เล่าต่อ|ความคืบหน้า/.test(t); }).slice(0, 3);
   const tags = (j.tags || []).map(function (t) { t = String(t).replace(/\s+/g, ''); return t.charAt(0) === '#' ? t : '#' + t; }).slice(0, 5);
   return {
-    kind: 'near', cat: cat, hook: cut(j.hook, 70), label: cut(j.label, 14), head: cut(j.head, 18), sub: cut(j.sub, 32),
-    big: cut(j.big, 10), unit: cut(j.unit, 14), pill: cut(j.pill, 26), pts: pts,
+    kind: 'near', cat: cat, hook: cut(j.hook, 120), label: cut(j.label, 24), head: cut(j.head, 40), sub: cut(j.sub, 70),
+    big: cut(j.big, 14), unit: cut(j.unit, 24), pill: cut(j.pill, 50), pts: pts,
     body: pts.map(function (t) { return '• ' + t; }).join('\n'),
     q: cut(j.q, 200), tags: tags, src: String(o.source || ''), visual: cut(j.visual, 300), scene: cut(j.scene, 200), decor: cut(j.decor, 200),
     person: cut(j.person, 80), place: cut(j.place, 200)
@@ -525,8 +526,8 @@ function coverSpec_(labelHint) {
 }
 function coverOf_(j) {
   const cut = function (v, n) { return String(v || '').trim().slice(0, n); };
-  return { label: cut(j.label, 14), head: cut(j.head, 18), sub: cut(j.sub, 32), big: cut(j.big, 10), unit: cut(j.unit, 14),
-    pill: cut(j.pill, 26), visual: cut(j.visual, 300), scene: cut(j.scene, 200), decor: cut(j.decor, 200),
+  return { label: cut(j.label, 24), head: cut(j.head, 40), sub: cut(j.sub, 70), big: cut(j.big, 14), unit: cut(j.unit, 24),
+    pill: cut(j.pill, 50), visual: cut(j.visual, 300), scene: cut(j.scene, 200), decor: cut(j.decor, 200),
     person: cut(j.person, 80), place: cut(j.place, 200) };
 }
 
