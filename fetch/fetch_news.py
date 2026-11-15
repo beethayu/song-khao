@@ -14,6 +14,7 @@ import sys
 import time
 import urllib.error
 import urllib.parse
+RETELL = False  # ปิดลุงเล่าอัตโนมัติ (2026-11-15 ผู้ใช้เหลือแค่ทำรูป) เปลี่ยนเป็น True เพื่อเปิดกลับ
 import urllib.request
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
@@ -431,7 +432,7 @@ def main():
         if r.get("left", 0) == 0 or r.get("done", 0) == 0:
             break
     facts_step()
-    for i in range(6):  # ให้ลุงเล่าทีละ 6 ข่าว สูงสุด 36 ข่าวต่อรอบ
+    for i in range(6 if RETELL else 0):  # ให้ลุงเล่าทีละ 6 ข่าว สูงสุด 36 ข่าวต่อรอบ
         try:
             r = call("retellPending", [6])
         except Exception as e:

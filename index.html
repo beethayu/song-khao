@@ -121,7 +121,8 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='7.7 · 2026-11-11';
+var VERSION='7.8 · 2026-11-15';
+var CLIP=false; // ปิดลุงเล่า+คำสั่งทำคลิป (ผู้ใช้ไม่ว่างทำคลิป 2026-11-15) เปลี่ยนเป็น true เพื่อเปิดกลับ
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
@@ -269,14 +270,14 @@ function itemHtml(it,i,hot){
     if(it.tag === 'อสังหาฯ' || it.tag === 'เพจ') {
       b+='<a class="btn pri" href="'+esc(it.url)+'" target="_blank" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">🔗 เปิดใน Facebook</a>';
     } else {
-      if(!it.lung&&!S.retelling[it.id])b+='<button class="btn acc" data-act="retell" data-id="'+esc(it.id)+'">ให้ลุงเล่า</button>';
+      if(CLIP&&!it.lung&&!S.retelling[it.id])b+='<button class="btn acc" data-act="retell" data-id="'+esc(it.id)+'">ให้ลุงเล่า</button>';
       if(!S.posting[it.id])b+='<button class="btn acc" data-act="post" data-id="'+esc(it.id)+'">'+(S.post[it.id]?'ทำโพสต์ใหม่':'สร้างโพสต์')+'</button>';
       if(S.post[it.id])b+='<button class="btn" data-act="cpost" data-id="'+esc(it.id)+'">คัดลอกโพสต์</button>';
       if(S.post[it.id]&&S.post[it.id].head){
         b+='<button class="btn acc" data-act="cimg" data-id="'+esc(it.id)+'">คัดลอกคำสั่งสร้างภาพ</button>';
         b+='<button class="btn acc" data-act="cimg2" data-id="'+esc(it.id)+'">คำสั่งภาพ: ฉากจริง'+(S.post[it.id].person?' + คนในข่าว':'')+'</button>';
       }
-      if(it.lung)b+='<button class="btn acc" data-act="cvid" data-id="'+esc(it.id)+'">'+(S.vidOpen[it.id]?'ซ่อนคำสั่งทำคลิป':'คำสั่งทำคลิป')+'</button>';
+      if(CLIP&&it.lung)b+='<button class="btn acc" data-act="cvid" data-id="'+esc(it.id)+'">'+(S.vidOpen[it.id]?'ซ่อนคำสั่งทำคลิป':'คำสั่งทำคลิป')+'</button>';
       b+='<button class="btn pri" data-act="ask" data-id="'+esc(it.id)+'">ถามลุง</button>';
     }
     
@@ -348,10 +349,10 @@ function setHtml(){
   return '<div class="card"><div class="row"><label>API URL</label><input id="cu" value="'+esc(c.url)+'" placeholder="https://script.google.com/…" autocapitalize="off" autocorrect="off" spellcheck="false"></div><div class="row"><label>API KEY</label><input id="ck" type="password" value="'+esc(c.key)+'" placeholder="รหัสที่ตั้งไว้" autocapitalize="off" autocorrect="off"></div></div>'+
   '<div class="acts" style="margin:0 0 6px"><button class="btn pri" data-act="test">ทดสอบการเชื่อมต่อ</button></div><div class="note" id="tst" style="margin:0 4px 16px;color:'+(S.tst.c||'var(--mut)')+'">'+esc(S.tst.t)+'</div>'+
   '<div class="card pad"><div class="h2">ลุงใช้ Gemini</div><div class="hint">ข่าวที่ลุงเล่าแล้วเก็บไว้ในชีตและในเครื่อง เปิดอ่านได้แม้ไม่ได้ใช้ Claude ส่วนแชทต้องใช้ Gemini ผ่านหลังบ้าน</div></div>'+
-  '<div class="card pad"><div class="h2">ตัวละครคนเล่า (คำสั่งทำคลิป)</div><div class="hint" style="margin-bottom:8px">บรรยายหน้าตา/การแต่งตัว/ฉากของลุงเป็นภาษาอังกฤษ ปล่อยว่างจะใช้ค่าเริ่มต้น และควรแนบภาพลุงไปกับทุกคลิปให้หน้าเหมือนเดิม</div><textarea id="vchar" rows="4" placeholder="'+esc(VCHAR_DEF)+'" style="font-size:16px;width:100%;padding:8px;border:1px solid #ccc;border-radius:8px">'+esc(S.vchar)+'</textarea><label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:15px"><input type="checkbox" id="vgreen" '+(S.vgreen?'checked':'')+' style="width:22px;height:22px"> ภาพลุงเป็นฉากเขียว (ให้คลิปคงพื้นเขียวไว้ลบใน CapCut)</label></div>'+
+  (CLIP?'<div class="card pad"><div class="h2">ตัวละครคนเล่า (คำสั่งทำคลิป)</div><div class="hint" style="margin-bottom:8px">บรรยายหน้าตา/การแต่งตัว/ฉากของลุงเป็นภาษาอังกฤษ ปล่อยว่างจะใช้ค่าเริ่มต้น และควรแนบภาพลุงไปกับทุกคลิปให้หน้าเหมือนเดิม</div><textarea id="vchar" rows="4" placeholder="'+esc(VCHAR_DEF)+'" style="font-size:16px;width:100%;padding:8px;border:1px solid #ccc;border-radius:8px">'+esc(S.vchar)+'</textarea><label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:15px"><input type="checkbox" id="vgreen" '+(S.vgreen?'checked':'')+' style="width:22px;height:22px"> ภาพลุงเป็นฉากเขียว (ให้คลิปคงพื้นเขียวไว้ลบใน CapCut)</label></div>'+
   '<div class="card pad"><div class="h2">ลุงประจำหมวด (ทำครั้งเดียว)</div><div class="hint" style="margin-bottom:8px">กดคัดลอก → เปิด Gemini → แนบภาพลุงปัจจุบัน → วาง → บันทึกภาพไว้อัลบั้ม "ลุง" · หน้าเดิม เปลี่ยนแค่ชุด · ตอนทำคลิปแอปจะบอกว่าข่าวนี้ใช้ชุดไหน</div><div class="acts" style="flex-wrap:wrap">'+
     Object.keys(OUTFIT).map(function(c){return '<button class="btn" data-act="coutfit" data-c="'+c+'">ชุด'+OUTFIT[c][0]+'</button>'}).join('')+
-    '<button class="btn" data-act="csheet">Character Sheet (ภาพหลายมุมไว้อ้างอิง)</button></div></div>'+
+    '<button class="btn" data-act="csheet">Character Sheet (ภาพหลายมุมไว้อ้างอิง)</button></div></div>':'')+
   '<div class="card pad"><div class="h2">เครื่องมือ</div><div class="acts"><button class="btn" data-act="size">เช็คพื้นที่เครื่อง</button><button class="btn" data-act="hist">ดูประวัติโพสต์ ('+Object.keys(S.post).length+')</button></div><div class="note" id="sizeOut" style="margin-top:10px;color:var(--mut)"></div></div>'+
   '<div class="card pad"><div class="h2">ข้อมูลในเครื่อง</div><div class="hint" style="margin-bottom:10px">ข่าวที่เก็บไว้ '+S.saved.length+' · ข้อความแชท '+S.chat.length+'</div><button class="btn" data-act="wipe">'+(S.wipeArm?'แตะอีกครั้งเพื่อยืนยันล้าง':'ล้างข้อมูลในเครื่อง')+'</button></div>'+
   '<div class="note" style="text-align:center">ส่งข่าว · เวอร์ชัน '+VERSION+'</div>';
