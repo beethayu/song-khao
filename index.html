@@ -121,7 +121,7 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='7.8 · 2026-11-15';
+var VERSION='8.0 · 2026-11-15';
 var CLIP=false; // ปิดลุงเล่า+คำสั่งทำคลิป (ผู้ใช้ไม่ว่างทำคลิป 2026-11-15) เปลี่ยนเป็น true เพื่อเปิดกลับ
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
@@ -263,7 +263,7 @@ function itemHtml(it,i,hot){
     else b+=fx+'<div class="note">ลุงยังไม่ได้เล่าข่าวนี้</div>';
     var link=/^https?:\/\//.test(it.url||'')?' · <a href="'+esc(it.url)+'" target="_blank" rel="noopener">อ่านต้นฉบับ</a>':'';
     if(S.posting[it.id])b+='<div class="load">ลุงกำลังเรียบเรียงโพสต์…</div>';
-    else if(S.post[it.id]){var p=S.post[it.id];b+='<div class="lh">โพสต์ที่ลุงร่างให้</div><div class="lung">'+esc(postText(p))+'</div><img class="pimg" src="'+postImg(p)+'" alt="การ์ดภาพ"><div class="note">กดค้างที่ภาพเพื่อบันทึก</div>'}
+    else if(S.post[it.id]){var p=S.post[it.id];b+='<div class="lh">โพสต์ที่ลุงร่างให้</div><div class="lung">'+esc(postText(p))+'</div><img class="pimg" src="'+postImg(p)+'" alt="การ์ดภาพ"><div class="note">กดค้างที่ภาพเพื่อบันทึก แล้วโพสต์ลงเฟซบุ๊กได้เลย</div>'}
     if(S.vidOpen[it.id]&&it.lung)b+=vidHtml(it);
     b+='<div class="note">ที่มา: '+esc(it.source||'-')+link+'</div><div class="acts">';
     
@@ -401,77 +401,6 @@ function wrapTh(x,text,maxW){
   if(cur.trim())lines.push(cur.trim());
   return lines;
 }
-// การ์ดข่าวใกล้ตัว: ป้ายแดง พาดหัวเหลืองตัวใหญ่ สรุป 3 ข้อสีขาว + ที่มา
-function postImgNearOld(p){
-  var W=1080,c=document.createElement('canvas');c.width=W;c.height=W;var x=c.getContext('2d');
-  var F='-apple-system,"Thonburi","Sarabun",sans-serif';
-  x.fillStyle='#101820';x.fillRect(0,0,W,W);
-  var r=36;x.fillStyle='#b3141c';x.beginPath();
-  x.moveTo(60+r,60);x.arcTo(W-60,60,W-60,W-60,r);x.arcTo(W-60,W-60,60,W-60,r);x.arcTo(60,W-60,60,60,r);x.arcTo(60,60,W-60,60,r);x.closePath();x.fill();
-  x.strokeStyle='#fff';x.lineWidth=6;x.stroke();
-  var pts=(p.pts&&p.pts.length)?p.pts:String(p.body||'').split('\n').map(function(t){return t.replace(/^[•\s]+/,'')}).filter(String).slice(0,3);
-  var maxW=W-240,fh=96,fp=50,hl,pl,hh,total;
-  for(;;){
-    x.font='800 '+fh+'px '+F;hl=wrapTh(x,p.hook,maxW);
-    x.font='600 '+fp+'px '+F;pl=pts.map(function(t){return wrapTh(x,'• '+t,maxW-10)});
-    hh=hl.length*fh*1.3;
-    total=hh+40+pl.reduce(function(a,l){return a+l.length*fp*1.4+14},0);
-    if(total<=700||(fh<=56&&fp<=34))break;
-    if(fh>56)fh-=6;if(fp>34)fp-=2;
-  }
-  var y=130;x.textBaseline='top';
-  x.fillStyle='#ffe14d';x.font='800 '+fh+'px '+F;
-  hl.forEach(function(l,i){x.fillText(l,120,y+i*fh*1.3)});
-  y+=hh+40;x.fillStyle='#fff';x.font='600 '+fp+'px '+F;
-  pl.forEach(function(ls){ls.forEach(function(l,i){x.fillText(l,120+(i?36:0),y);y+=fp*1.4});y+=14});
-  x.fillStyle='#ffd0d0';x.font='500 32px '+F;
-  var src=p.src?'ที่มา: '+p.src:'';
-  while(src.length>8&&x.measureText(src).width>W-240)src=src.slice(0,-2);
-  if(src)x.fillText(src,120,W-170);
-  x.fillText('ส่งข่าว · ลุงเล่า',120,W-120);
-  return c.toDataURL('image/png');
-}
-// ปกคลิปแนวตั้ง 9:16 สไตล์ข่าวไวรัล: ป้าย + คำหลักตัวยักษ์ + แถบสิ่งที่เกิด + ตัวเลขเด่น + แถบล่าง · เว้นล่าง ~38% ไว้วางคนเล่าใน CapCut
-function postImgCover(p){
-  var W=1080,H=1920,c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d');
-  var F='-apple-system,"Thonburi","Sarabun",sans-serif';
-  var alert=p.cat==='alert';
-  var g=x.createLinearGradient(0,0,0,H);
-  if(alert){g.addColorStop(0,'#3a0508');g.addColorStop(.55,'#7a0d14');g.addColorStop(1,'#1c0204')}
-  else{g.addColorStop(0,'#071c4d');g.addColorStop(.55,'#0f3a9e');g.addColorStop(1,'#04102e')}
-  x.fillStyle=g;x.fillRect(0,0,W,H);
-  // แสงฟุ้งกลางภาพ
-  var rg=x.createRadialGradient(W/2,620,40,W/2,620,700);rg.addColorStop(0,'rgba(255,255,255,.18)');rg.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=rg;x.fillRect(0,0,W,H);
-  x.textAlign='center';x.textBaseline='middle';x.lineJoin='round';
-  function fit(t,w,max,min){var z=max;for(;z>min;z-=4){x.font='900 '+z+'px '+F;if(x.measureText(t).width<=w)break}return z}
-  function txt(t,cx,cy,size,fill,stroke,sw){x.font='900 '+size+'px '+F;if(stroke){x.strokeStyle=stroke;x.lineWidth=sw;x.strokeText(t,cx,cy)}x.fillStyle=fill;x.fillText(t,cx,cy)}
-  function band(cx,cy,w,h,col,rot){x.save();x.translate(cx,cy);x.rotate(rot);x.fillStyle=col;x.beginPath();x.moveTo(-w/2+18,-h/2);x.lineTo(w/2,-h/2);x.lineTo(w/2-18,h/2);x.lineTo(-w/2,h/2);x.closePath();x.fill();x.restore()}
-  function lines(t,w,size){x.font='900 '+size+'px '+F;return wrapTh(x,t,w)}
-  var y=190;
-  // ป้าย (ข่าวดี/เตือน!)
-  if(p.label){var ls=fit(p.label,620,150,80);x.font='900 '+ls+'px '+F;var lw=x.measureText(p.label).width+90;
-    band(W/2,y,lw,ls*1.35,alert?'#ffd400':'#e3131b',-0.05);
-    x.save();x.translate(W/2,y);x.rotate(-0.05);txt(p.label,0,6,ls,alert?'#b0000b':'#fff','rgba(0,0,0,.25)',6);x.restore();
-    y+=ls*0.75+40}
-  // คำหลักตัวยักษ์
-  var hs=fit(p.head,W-110,230,120),hl=x.measureText(p.head).width>W-110?lines(p.head,W-110,hs):[p.head];
-  hl.forEach(function(l){y+=hs*0.62;txt(l,W/2,y,hs,'#ffd400','#3b1d00',22);y+=hs*0.62});
-  // แถบสิ่งที่เกิด
-  if(p.sub){y+=30;var ss=fit(p.sub,W-170,110,60),sl=x.measureText(p.sub).width>W-170?lines(p.sub,W-170,ss):[p.sub];
-    sl.forEach(function(l){band(W/2,y+ss*0.62,W-90,ss*1.3,alert?'#111':'#e3131b',-0.02);txt(l,W/2,y+ss*0.66,ss,'#fff',null,0);y+=ss*1.4})}
-  // ตัวเลขเด่น
-  if(p.big){y+=40;var bs=fit(p.big,W-260,330,150);y+=bs*0.5;txt(p.big,W/2,y,bs,alert?'#ffd400':'#ff2a2a','#fff',26);y+=bs*0.55;
-    if(p.unit){var us=fit(p.unit,W-200,96,60);y+=us*0.45;txt(p.unit,W/2,y,us,'#fff','#000',12);y+=us*0.6}}
-  // แถบล่าง (pill)
-  if(p.pill){y+=40;var ps=fit(p.pill,W-260,84,50);x.font='900 '+ps+'px '+F;var pw=Math.min(x.measureText(p.pill).width+110,W-80),ph=ps*1.45;
-    x.fillStyle='#ffd400';x.beginPath();x.moveTo(W/2-pw/2+ph/2,y);x.arcTo(W/2+pw/2,y,W/2+pw/2,y+ph,ph/2);x.arcTo(W/2+pw/2,y+ph,W/2-pw/2,y+ph,ph/2);x.arcTo(W/2-pw/2,y+ph,W/2-pw/2,y,ph/2);x.arcTo(W/2-pw/2,y,W/2+pw/2,y,ph/2);x.closePath();x.fill();
-    txt(p.pill,W/2,y+ph/2+4,ps,'#0a1f55',null,0);y+=ph}
-  // ด้านล่างเว้นว่างไว้วางคนเล่าใน CapCut (ไม่วาดกรอบ จะได้ไม่ติดในภาพจริง)
-  x.textAlign='left';x.fillStyle='rgba(255,255,255,.75)';x.font='500 34px '+F;
-  var src=p.src?'ที่มา: '+p.src:'';while(src.length>8&&x.measureText(src).width>W-140)src=src.slice(0,-2);
-  if(src)x.fillText(src,70,H-95);x.fillText('ส่งข่าว · ลุงเล่า',70,H-50);
-  return c.toDataURL('image/png');
-}
 // คำสั่งสร้างภาพปก (อังกฤษ แบ่งโซน + แยกบรรทัด) ตามที่ผู้ใช้ทดสอบกับ Gemini แล้วได้ผล · ข้อความไทยมาจากช่องของโพสต์ตรง ๆ ไม่ให้ AI แต่งเอง
 function splitTh(t){ // แบ่งข้อความยาวเป็น 2 บรรทัดตรงรอยคำ
   if(!t||t.length<=12)return [t];
@@ -496,9 +425,9 @@ function imgPromptOf(p){
   var scene=p.scene?(' with '+p.scene):'';
   var L=[],n=1;
   function line(desc,txt){L.push('- Line '+(n++)+': '+desc+' "'+txt+'"')}
-  L.push('Vertical 9:16 mobile thumbnail for a Thai news video, mood: '+mood+'. If a reference image is attached, follow its layout and spacing.');
+  L.push((CLIP?'Vertical 9:16 mobile thumbnail for a Thai news video':'Vertical 4:5 image for a Thai news Facebook post')+', mood: '+mood+'. If a reference image is attached, follow its layout and spacing.');
   L.push('ONE seamless full-frame background from top to bottom: a dynamic '+bg+' gradient'+scene+', glowing light rays, sparkles and abstract '+acc+' accent streaks flowing through the whole image. No dividing line, no horizontal split, no separate panels or blocks, no change of background between top and bottom.');
-  L.push('Group the large, vibrant 3D Thai text and the illustration in the upper ~60% of the frame; the lower ~40% stays free of text so a video presenter can be placed there later, but it is the same continuous background.');
+  L.push(CLIP?'Group the large, vibrant 3D Thai text and the illustration in the upper ~60% of the frame; the lower ~40% stays free of text so a video presenter can be placed there later, but it is the same continuous background.':'Use the whole frame: large, vibrant 3D Thai text fills the upper ~65%, and a big eye-catching 3D illustration fills the lower ~35%. No empty areas.');
   L.push('Render every Thai word exactly as written below, with correct spelling, vowels and tone marks. Keep each line as one line and never split a word across lines. Do not add any other text anywhere.');
   L.push('');L.push('Text, top to bottom (centered; lines next to the illustration shift slightly to the '+other+'):');
   if(p.label)line('a slanted '+(al?'yellow banner with 3D red':'red banner with 3D white')+' text',p.label);
@@ -507,10 +436,15 @@ function imgPromptOf(p){
   if(p.big)L.push('- Line '+(n++)+': a giant 3D red number "'+p.big+'" with a thick black and white outline'+(p.unit?', followed on the same line by 3D yellow text "'+p.unit+'"':''));
   if(p.pill)line('a rounded '+(al?'black and yellow':'red')+' badge (not a full-width bar) with 3D white text',p.pill);
   L.push('');L.push('Illustration:');
+  if(CLIP){
   L.push('- On the middle-'+side+', a 3D illustration of '+vis+', compact, inside the top 60%, not covering any text. Any card, phone screen or document in the illustration must show only blank shapes, lines and icons, with no letters or words.');
   L.push('');L.push('Lower ~40% (presenter space, same background):');
   L.push('- No text and no large objects here. The light rays and sparkles from above continue down naturally so the image feels like one piece.');
   L.push('- Only along the very bottom edge, small softly blurred decorative elements: '+decor+'. Keep the center clear.');
+  }else{
+    L.push('- Across the lower ~35% of the frame, a large detailed 3D illustration of '+vis+', centered slightly to the '+side+', not covering any text. Any card, phone screen or document in the illustration must show only blank shapes, lines and icons, with no letters or words.');
+    L.push('- Around it, small softly blurred decorative elements: '+decor+'.');
+  }
   L.push('');L.push('Do not include: human faces, real government or agency logos, watermarks, extra text.');
   return L.join('\n');
 }
@@ -593,7 +527,7 @@ function imgStoryPromptOf(p){
   var place=p.place||p.scene||'a Thai street scene related to the story';
   var L=[],n=1;
   function line(desc,txt){L.push('- Line '+(n++)+': '+desc+' "'+txt+'"')}
-  L.push('Vertical 9:16 mobile thumbnail for a Thai news video, vibrant Thai breaking-news style. If a reference image is attached for layout, follow its layout.');
+  L.push((CLIP?'Vertical 9:16 mobile thumbnail for a Thai news video':'Vertical 4:5 image for a Thai news Facebook post')+', vibrant Thai breaking-news style. If a reference image is attached for layout, follow its layout.');
   L.push('Background: a realistic, softly blurred scene of '+place+', no people in the background, slightly darkened behind the text so the text stays readable. One seamless image, no dividing lines or panels.');
   L.push('Render every Thai word exactly as written below, with correct spelling, vowels and tone marks. Keep each line as one line and never split a word across lines. Do not add any other text except the small caption mentioned at the end.');
   L.push('');L.push('Text in the upper half, top to bottom, on bold torn-paper style banners ('+(al?'red, black and yellow':'red, navy blue and yellow')+'):');
@@ -610,40 +544,139 @@ function imgStoryPromptOf(p){
   }else{
     L.push('Lower-left: a 3D illustration of '+(p.visual||'objects related to the story')+', no people.');
   }
-  L.push('Lower-center and lower-right: keep clear (space for a video presenter added later), only the blurred background.');
+  if(CLIP)L.push('Lower-center and lower-right: keep clear (space for a video presenter added later), only the blurred background.');
   L.push('Small caption in the bottom-left corner, small white text: "ภาพประกอบ"');
   L.push('');L.push('Do not include: real government or agency logos, watermarks, any other people, any text other than listed.');
   return L.join('\n');
 }
-function postImg(p){
-  var key=(p.kind||'')+'|'+p.hook+'|'+(p.body||'').length;
-  if(IMGC[key])return IMGC[key];
-  if(p.kind==='near')return IMGC[key]=(p.head?postImgCover(p):postImgNearOld(p));
-  return IMGC[key]=postImgBase(p);
+// ---------- การ์ดภาพโพสต์ 4:5 (1080×1350) ใช้ลงเฟซบุ๊กได้เลย · ฟอนต์ Kanit เก็บใน repo (fonts/, OFL) ----------
+var KF='Kanit,"IBM Plex Sans Thai",-apple-system,"Thonburi",sans-serif',FONTP=null;
+function loadFonts(){
+  if(!window.FontFace||!document.fonts)return;
+  var TH='U+0E01-0E5B,U+200C-200D,U+25CC',LA='U+0000-00FF,U+2000-206F,U+20AC';
+  FONTP=Promise.all([['latin-700','700',LA],['thai-700','700',TH],['latin-900','900',LA],['thai-900','900',TH]].map(function(a){
+    var f=new FontFace('Kanit','url(fonts/kanit-'+a[0]+'.woff2)',{weight:a[1],unicodeRange:a[2]});document.fonts.add(f);return f.load()}))
+    .then(function(){IMGC={};if(Object.keys(S.post).length)render(true)}).catch(function(){});
 }
-function postImgBase(p){
-  var W=1080,c=document.createElement('canvas');c.width=W;c.height=W;var x=c.getContext('2d');
-  var g=x.createLinearGradient(0,0,W,W);g.addColorStop(0,'#1d2b4a');g.addColorStop(1,'#0a0f1f');x.fillStyle=g;x.fillRect(0,0,W,W);
-  x.fillStyle='#ff8a3d';x.fillRect(90,150,120,10);
-  x.fillStyle='#fff';x.textBaseline='top';
-  var fs=82,font=function(s){x.font='700 '+s+'px -apple-system,"Thonburi","Sarabun",sans-serif'};
-  var segs=(window.Intl&&Intl.Segmenter)?Array.from(new Intl.Segmenter('th',{granularity:'word'}).segment(p.hook),function(s){return s.segment}):p.hook.split('');
-  var lines;
-  for(;;){
-    font(fs);lines=[];var cur='';
-    segs.forEach(function(s){var t=cur+s;if(x.measureText(t).width>W-180&&cur){lines.push(cur.trim());cur=s}else cur=t});
-    if(cur.trim())lines.push(cur.trim());
-    if(lines.length<=6||fs<48)break;fs-=6;
+// ชุดสี [เข้ม, กลาง, สีเน้น] หมุนตามข่าว (คงที่ต่อข่าว)
+var CP={
+  alert:[['#3d0408','#b3141c','#ffd400'],['#16161b','#8a2a05','#ffb800'],['#260a38','#7a1030','#ffd400']],
+  welfare:[['#051d52','#1250c4','#ffd400'],['#04302f','#0d8a72','#ffe14d'],['#220c55','#6a2bd1','#ffd400']],
+  econ:[['#08223f','#0f6aa8','#ffd400'],['#351605','#b85a0a','#fff06a']],
+  agri:[['#08321a','#1f8a3a','#ffe14d'],['#332405','#8a6a10','#fff06a']],
+  protest:[['#161c26','#3a4a60','#ffd400']],
+  ent:[['#3d083d','#c2187a','#ffe14d'],['#220c55','#8a2be2','#ffd400']],
+  world:[['#051640','#1a4fb0','#ffd400'],['#072733','#127a8a','#ffe14d']],
+  th:[['#330811','#c21e3a','#ffd400'],['#170e42','#5a2bd1','#ffd400'],['#08223f','#d1481e','#ffe14d']],
+  serious:[['#101216','#2c333d','#ffffff']]
+};
+var DEFLAB={alert:'เตือน!',welfare:'ต้องรู้!',econ:'ต้องรู้!',agri:'ชาวไร่ต้องรู้!',protest:'จับตา!',ent:'บันเทิง',world:'รอบโลก',th:'ประเด็นร้อน'};
+// ไอคอนการ์ตูนแบน ๆ วาดในกรอบรัศมี ~60 รอบจุด (0,0)
+var ICON={
+  alert:function(x){x.lineJoin='round';x.beginPath();x.moveTo(0,-50);x.lineTo(54,44);x.lineTo(-54,44);x.closePath();x.fillStyle='#ffc400';x.strokeStyle='#ffc400';x.lineWidth=16;x.stroke();x.fill();
+    x.fillStyle='#2a1a00';rr(x,-7,-22,14,38,6);x.fill();x.beginPath();x.arc(0,32,9,0,7);x.fill()},
+  welfare:function(x){x.fillStyle='#1250c4';rr(x,-58,-40,104,68,12);x.fill();x.fillStyle='rgba(255,255,255,.35)';x.fillRect(-58,-24,104,13);x.fillStyle='#ffd400';rr(x,-46,-2,26,19,5);x.fill();
+    x.beginPath();x.arc(34,28,28,0,7);x.fillStyle='#ffc400';x.fill();x.lineWidth=5;x.strokeStyle='#e08a00';x.stroke();x.fillStyle='#7a4a00';x.font='900 34px '+KF;x.textAlign='center';x.fillText('฿',34,41)},
+  econ:function(x){[['#7fb8ff',-50,22],['#3d8bea',-16,44],['#1250c4',18,68]].forEach(function(b){x.fillStyle=b[0];rr(x,b[1],48-b[2],26,b[2],6);x.fill()});
+    x.strokeStyle='#e3131b';x.lineWidth=11;x.lineCap='round';x.lineJoin='round';x.beginPath();x.moveTo(-52,-8);x.lineTo(-14,-34);x.lineTo(8,-20);x.lineTo(50,-52);x.stroke();x.beginPath();x.moveTo(24,-54);x.lineTo(52,-54);x.lineTo(52,-26);x.stroke()},
+  agri:function(x){x.strokeStyle='#2e9e4a';x.lineWidth=10;x.lineCap='round';x.beginPath();x.moveTo(0,50);x.lineTo(0,-18);x.stroke();
+    function leaf(a,l,c){x.save();x.translate(0,a[0]);x.rotate(a[1]);x.beginPath();x.moveTo(0,0);x.quadraticCurveTo(l*.5,-l*.42,l,0);x.quadraticCurveTo(l*.5,l*.3,0,0);x.fillStyle=c;x.fill();x.restore()}
+    leaf([-16,-1.15],46,'#3fc15f');leaf([8,-0.5],52,'#2e9e4a');leaf([8,Math.PI+0.5],52,'#3fc15f');leaf([28,-0.35],40,'#57d477');leaf([28,Math.PI+0.35],40,'#2e9e4a');
+    x.fillStyle='#8a5a2a';rr(x,-46,46,92,13,6);x.fill()},
+  protest:function(x){x.fillStyle='#e3131b';x.beginPath();x.moveTo(-30,-14);x.lineTo(30,-44);x.lineTo(30,40);x.lineTo(-30,12);x.closePath();x.fill();x.fillStyle='#8f0d12';rr(x,-52,-16,26,30,6);x.fill();rr(x,-30,10,16,36,6);x.fill();
+    x.strokeStyle='#ffb800';x.lineWidth=7;x.lineCap='round';[[14,.5],[26,.6]].forEach(function(a){x.beginPath();x.arc(32,-2,a[0],-a[1],a[1]);x.stroke()})},
+  ent:function(x){x.beginPath();for(var i=0;i<10;i++){var r=i%2?26:58,a=-Math.PI/2+i*Math.PI/5;x[i?'lineTo':'moveTo'](Math.cos(a)*r,Math.sin(a)*r+4)}x.closePath();x.lineJoin='round';x.fillStyle='#ffc400';x.strokeStyle='#ff8a00';x.lineWidth=7;x.fill();x.stroke()},
+  world:function(x){x.beginPath();x.arc(0,0,54,0,7);x.fillStyle='#2a7be4';x.fill();x.save();x.clip();x.fillStyle='#4ccf7a';x.beginPath();x.ellipse(-22,-18,24,18,.4,0,7);x.fill();x.beginPath();x.ellipse(24,22,22,15,-.3,0,7);x.fill();x.beginPath();x.ellipse(30,-34,14,9,0,0,7);x.fill();x.restore();
+    x.strokeStyle='rgba(255,255,255,.55)';x.lineWidth=4;x.beginPath();x.ellipse(0,0,24,54,0,0,7);x.stroke();x.beginPath();x.moveTo(-54,0);x.lineTo(54,0);x.stroke()},
+  th:function(x){function bub(cx,cy,w,h,c,tail,ch){x.fillStyle=c;rr(x,cx-w/2,cy-h/2,w,h,16);x.fill();x.beginPath();x.moveTo(cx+tail*10,cy+h/2-2);x.lineTo(cx+tail*26,cy+h/2+18);x.lineTo(cx+tail*30,cy+h/2-2);x.fill();x.fillStyle='#fff';x.font='900 40px '+KF;x.textAlign='center';x.fillText(ch,cx,cy+14)}
+    bub(-18,-22,72,54,'#e3131b',-1,'!');bub(22,22,68,50,'#1250c4',1,'?')}
+};
+function rr(x,a,b,w,h,r){r=Math.min(r,w/2,h/2);x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath()}
+function postImgCard(p){
+  var W=1080,H=1350,c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d');
+  var cat=CP[p.cat]&&p.cat!=='serious'?p.cat:'th',serious=p.mood==='serious';
+  var list=serious?CP.serious:CP[cat],pal=list[hashStr((p.head||p.hook)+'|'+(p.sub||''))%list.length],D=pal[0],M=pal[1],A=pal[2];
+  function F(w,s){x.font=w+' '+Math.round(s)+'px '+KF}
+  function fit(t,w,max,min,wt){var z=max;for(;z>min;z-=4){F(wt||900,z);if(x.measureText(t).width<=w)break}F(wt||900,z);return z}
+  function t3(t,ax,by,size,fill,edge,sw,shadow,align){F(900,size);x.textAlign=align||'center';x.textBaseline='alphabetic';x.lineJoin='round';
+    if(shadow){x.strokeStyle=shadow;x.lineWidth=sw;x.strokeText(t,ax,by+size*.075)}
+    if(edge){x.strokeStyle=edge;x.lineWidth=sw;x.strokeText(t,ax,by)}x.fillStyle=fill;x.fillText(t,ax,by)}
+  function gold(by,size){if(A==='#ffffff')return '#fff';var g=x.createLinearGradient(0,by-size*.95,0,by+size*.1);g.addColorStop(0,'#fffbd0');g.addColorStop(.45,A);g.addColorStop(1,'#ffa200');return g}
+  function para(cx,cy,w,h,col,sk){x.beginPath();x.moveTo(cx-w/2+sk,cy-h/2);x.lineTo(cx+w/2,cy-h/2);x.lineTo(cx+w/2-sk,cy+h/2);x.lineTo(cx-w/2,cy+h/2);x.closePath();x.fillStyle=col;x.fill()}
+  var B,focus;
+  function build(k){
+    B=[];focus=null;
+    // 1) ป้าย + ไอคอนหมวด
+    var lab=p.label||DEFLAB[cat],ls=fit(lab,W-420,118*k,60),lw=x.measureText(lab).width+84,lh=ls*1.42;
+    var labBg=serious?'#ffffff':cat==='alert'?'#ffd400':'#e3131b',labTx=serious?'#14171c':cat==='alert'?'#b0000b':'#ffffff';
+    B.push({h:176*k,draw:function(y){var cy=y+88*k;
+      x.save();x.translate(64+lw/2,cy);x.rotate(-.045);para(6,10,lw,lh,'rgba(0,0,0,.35)',20);para(0,0,lw,lh,labBg,20);
+      F(900,ls);x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle=labTx;x.fillText(lab,0,ls*.35);x.restore();
+      var r=82*k,cx=W-64-r;x.beginPath();x.arc(cx+5,cy+8,r,0,7);x.fillStyle='rgba(0,0,0,.3)';x.fill();
+      x.beginPath();x.arc(cx,cy,r,0,7);x.fillStyle='#fff';x.fill();x.lineWidth=9;x.strokeStyle=A==='#ffffff'?'#9aa3b0':A;x.stroke();
+      x.save();x.translate(cx,cy);x.scale(r/82,r/82);(ICON[cat]||ICON.th)(x);x.restore()}});
+    // 2) คำหลักตัวยักษ์
+    var head=p.head||'',hl,hs;
+    if(head){hs=fit(head,W-110,216*k,110);hl=[head];
+      if(hs<150&&head.length>8){var two=splitTh(head);if(two.length===2){var s2=Math.min(fit(two[0],W-110,190*k,90),fit(two[1],W-110,190*k,90));if(s2>hs*1.2){hs=s2;hl=two}}}
+      F(900,hs);if(hl.length===1&&x.measureText(head).width>W-110)hl=wrapTh(x,head,W-110).slice(0,2);
+    }else{hs=118*k;for(;;){F(900,hs);hl=wrapTh(x,p.hook||'',W-130);if(hl.length<=4||hs<=70)break;hs-=6}hl=hl.slice(0,5)}
+    B.push({h:hl.length*hs*1.2,foc:!p.big,draw:function(y){hl.forEach(function(l,i){var by=y+i*hs*1.2+hs*.98;t3(l,W/2,by,hs,gold(by,hs),D,hs*.11,'rgba(0,0,0,.55)')})}});
+    // 3) แถบสิ่งที่เกิด
+    if(p.sub&&head){var ss=fit(p.sub,W-190,84*k,54,700),sl=[p.sub];if(x.measureText(p.sub).width>W-190){sl=splitTh(p.sub);ss=Math.min(fit(sl[0],W-190,76*k,40,700),fit(sl[sl.length-1],W-190,76*k,40,700))}
+      var sh=ss*1.5;B.push({h:sl.length*(sh+8)-8,draw:function(y){sl.forEach(function(l,i){var cy=y+i*(sh+8)+sh/2;F(700,ss);var w=x.measureText(l).width+90;
+        para(W/2+5,cy+7,w,sh,'rgba(0,0,0,.35)',18);para(W/2,cy,w,sh,i?A:'#0b0d12',18);x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle=i?D:'#fff';x.fillText(l,W/2,cy+ss*.34)})}})}
+    // 4) ตัวเลขเด่น + หน่วย
+    if(p.big&&head){var bs=fit(p.big,W*.56,290*k,130),bw=x.measureText(p.big).width,us=p.unit?fit(p.unit,W*.36,92*k,48):0,uw=p.unit?x.measureText(p.unit).width:0,tw=bw+(uw?28+uw:0);
+      B.push({h:bs*1.02,foc:1,draw:function(y){var by=y+bs*.9,sx=(W-tw)/2;t3(p.big,sx,by,bs,'#fff',D,bs*.085,'#e3131b',"left");if(uw)t3(p.unit,sx+bw+28,by,us,gold(by,us),D,us*.14,'rgba(0,0,0,.5)','left')}})}
+    // 5) ป้ายเสริม (วันที่ ฯลฯ)
+    if(p.pill&&head){var ps=fit(p.pill,W-240,60*k,40,700),pw=x.measureText(p.pill).width+96,ph=ps*1.6;
+      B.push({h:ph,draw:function(y){x.fillStyle='rgba(0,0,0,.3)';rr(x,W/2-pw/2+4,y+7,pw,ph,ph/2);x.fill();x.fillStyle=A;rr(x,W/2-pw/2,y,pw,ph,ph/2);x.fill();F(700,ps);x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle=D;x.fillText(p.pill,W/2,y+ph/2+ps*.34)}})}
+    // 6) กล่องเนื้อหา: สรุปเป็นข้อ / เลือกข้าง / ประโยคเปิด
+    var pts=(p.pts||[]).filter(String).slice(0,3),sd=(p.mood==='jig'&&p.sides?String(p.sides).split('/'):[]).map(function(t){return t.trim()}).filter(String);
+    if(pts.length){var fp=46*k,PW=W-120;F(700,fp);var rows=pts.map(function(t){return wrapTh(x,t,PW-150).slice(0,3)}),lhh=fp*1.34,hh=rows.reduce(function(a,r){return a+r.length*lhh+30},0)+26;
+      B.push({h:hh,draw:function(y){x.fillStyle='rgba(0,0,0,.3)';rr(x,66,y+10,PW,hh,38);x.fill();x.fillStyle='#fff';rr(x,60,y,PW,hh,38);x.fill();var yy=y+28;
+        rows.forEach(function(r,i){if(i){x.fillStyle='#e6e9ef';x.fillRect(150,yy-15,PW-130,3)}
+          x.beginPath();x.arc(108,yy+lhh/2,29,0,7);x.fillStyle=M;x.fill();F(900,34);x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle='#fff';x.fillText(String(i+1),108,yy+lhh/2+12);
+          F(700,fp);x.textAlign='left';x.fillStyle='#14171c';r.forEach(function(l,j){x.fillText(l,158,yy+j*lhh+fp*1.02)});yy+=r.length*lhh+30})}})}
+    else if(sd.length===2&&head){var bw2=(W-120-24)/2,bh=210*k,cs=50*k;
+      B.push({h:cs*1.5+bh,draw:function(y){F(700,cs);x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle='#fff';x.fillText('คุณอยู่ทีมไหน',W/2,y+cs);var by=y+cs*1.5;
+        [['#1763e0',60],['#e3131b',60+bw2+24]].forEach(function(b,i){x.fillStyle='rgba(0,0,0,.3)';rr(x,b[1]+6,by+10,bw2,bh,34);x.fill();x.fillStyle=b[0];rr(x,b[1],by,bw2,bh,34);x.fill();
+          var z=fit(sd[i],bw2-90,64*k,40),ln=[sd[i]];if(x.measureText(sd[i]).width>bw2-90){ln=splitTh(sd[i]);z=Math.min(fit(ln[0],bw2-90,56*k,26),fit(ln[ln.length-1],bw2-90,56*k,26))}
+          F(900,z);x.fillStyle='#fff';x.textAlign='center';var cx=b[1]+bw2/2+(i?16:-16),t0=by+bh/2-(ln.length-1)*z*.62+z*.34;ln.forEach(function(l,j){x.fillText(l,cx,t0+j*z*1.24)})});
+        x.beginPath();x.arc(W/2,by+bh/2,60*k,0,7);x.fillStyle='#ffd400';x.fill();x.lineWidth=10;x.strokeStyle='#14171c';x.stroke();F(900,54*k);x.fillStyle='#14171c';x.textAlign='center';x.fillText('VS',W/2,by+bh/2+19*k)}})}
+    else if(head&&p.hook&&p.hook!==head){var fh=54*k;F(700,fh);var hk=wrapTh(x,p.hook,W-230).slice(0,4),h2=hk.length*fh*1.36+64;
+      B.push({h:h2,draw:function(y){x.fillStyle='rgba(0,0,0,.42)';rr(x,60,y,W-120,h2,34);x.fill();x.fillStyle=A;rr(x,60,y+26,12,h2-52,6);x.fill();F(700,fh);x.textAlign='left';x.textBaseline='alphabetic';x.fillStyle='#fff';hk.forEach(function(l,i){x.fillText(l,112,y+32+i*fh*1.36+fh*1.02)})}})}
+    return B.reduce(function(a,b){return a+b.h},0);
   }
-  lines.forEach(function(l,i){x.fillText(l,90,210+i*fs*1.35)});
-  x.fillStyle='#9fb0d0';font(34);x.fillText('ส่งข่าว · ลุงเล่า',90,W-130);
+  var top=40,bot=H-96-30,avail=bot-top,sum,ks=[1,.92,.84,.76,.68];
+  for(var i=0;i<ks.length;i++){sum=build(ks[i]);if(sum+(B.length-1)*22<=avail)break}
+  var gap=Math.max(14,Math.min(72,(avail-sum)/Math.max(1,B.length-1))),y=top+Math.max(0,(avail-sum-gap*(B.length-1))/2)*.6,fy=H*.42;
+  B.forEach(function(b){b.y=y;if(b.foc)fy=y+b.h/2;y+=b.h+gap});
+  // พื้นหลัง: ไล่สี + แฉกแสง + จุดฮาล์ฟโทน + ขอบมืด
+  var g=x.createLinearGradient(0,0,W*.35,H);g.addColorStop(0,D);g.addColorStop(.48,M);g.addColorStop(1,D);x.fillStyle=g;x.fillRect(0,0,W,H);
+  if(!serious){x.save();x.translate(W/2,fy);x.fillStyle='rgba(255,255,255,.05)';for(var a=0;a<24;a++){x.rotate(Math.PI/12);x.beginPath();x.moveTo(0,0);x.lineTo(1700,-110);x.lineTo(1700,110);x.closePath();x.fill()}x.restore()}
+  var rg=x.createRadialGradient(W/2,fy,30,W/2,fy,640);rg.addColorStop(0,'rgba(255,255,255,.22)');rg.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=rg;x.fillRect(0,0,W,H);
+  function dots(ox,oy){for(var gx=-300;gx<=300;gx+=30)for(var gy=-300;gy<=300;gy+=30){var d=Math.sqrt(gx*gx+gy*gy);if(d<300){x.beginPath();x.arc(ox+gx,oy+gy,10*(1-d/300),0,7);x.fill()}}}
+  x.fillStyle='rgba(255,255,255,.09)';dots(W-10,330);dots(10,H-330);
+  var vg=x.createRadialGradient(W/2,H/2,H*.38,W/2,H/2,H*.78);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.45)');x.fillStyle=vg;x.fillRect(0,0,W,H);
+  B.forEach(function(b){b.draw(b.y)});
+  // แถบล่าง: ที่มา + ชื่อเพจ
+  x.fillStyle='rgba(0,0,0,.55)';x.fillRect(0,H-96,W,96);x.fillStyle=A;x.fillRect(0,H-96,W,6);
+  x.textBaseline='alphabetic';F(900,40);x.textAlign='right';x.fillStyle=A;x.fillText('ส่งข่าว',W-60,H-32);var bwid=x.measureText('ส่งข่าว').width;
+  F(700,32);x.textAlign='left';x.fillStyle='rgba(255,255,255,.88)';var src=p.src?'ที่มา: '+p.src:'';while(src.length>8&&x.measureText(src).width>W-180-bwid)src=src.slice(0,-2);if(src)x.fillText(src,60,H-34);
   return c.toDataURL('image/png');
+}
+function postImg(p){
+  var key=[p.cat,p.mood,p.label,p.head,p.sub,p.big,p.pill,p.hook,p.sides,(p.pts||[]).join('|')].join('~');
+  return IMGC[key]||(IMGC[key]=postImgCard(p));
 }
 async function doPost(id){
   if(S.posting[id])return;
   S.posting[id]=1;render(true);
   try{
     S.post[id]=await api('makePost',[id],120000);
+    var it0=find(id);if(it0&&it0.sides&&S.post[id]&&S.post[id].mood==='jig')S.post[id].sides=it0.sides;
   }catch(e){
     var it=find(id);
     if(it){
@@ -842,6 +875,7 @@ document.addEventListener('visibilitychange',function(){
 });
 
 render();
+loadFonts();
 checkUpdate();
 if(Date.now()-(S.news.at||0)>10*60*1000)loadNews();
 })();
