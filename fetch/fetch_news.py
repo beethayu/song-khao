@@ -363,6 +363,7 @@ def facts_step():
         try:
             if via_g:
                 g_try += 1
+                time.sleep(3)  # Google News จำกัดความถี่การถอดลิงก์
             # ลิงก์ Google News: เครื่อง Actions ถอดไม่ได้ (no-signature) → ส่งว่างให้ Apps Script ถอด+อ่านเอง
             text = "" if via_g else article_text(it["url"])
             if len(text) >= 200:
@@ -376,7 +377,7 @@ def facts_step():
             ok += 1 if r.get("has") else 0
             srch += 1 if r.get("has") and r.get("via") == "search" else 0
             if r.get("err"):
-                print("ค้นเว็บแทนไม่ได้:", str(r["err"])[:90])
+                print("ค้นเว็บแทนไม่ได้:", str(r["err"])[:170])
         except Exception as e:
             print("สรุปข่าวย่อล้มเหลว:", str(e)[:100])
     print(f"ข่าวย่อ: ขอ {len(todo)} · อ่านเนื้อได้ {got} · สรุปสำเร็จ {ok} · อ่านไม่ได้ {bad} · ลิงก์ Google News {g_ok}/{g_try} · ค้นเว็บแทน {srch}")

@@ -355,7 +355,7 @@ function gnResolve_(url) {
   const mm = /garturlres\\",\\"(https?:[^"]+?)\\"/.exec(res);
   if (mm) return mm[1].replace(/\\+u003d/g, '=').replace(/\\+u0026/g, '&').replace(/\\+\//g, '/').replace(/\\+$/, '');
   try { const parsed = JSON.parse(res.split('\n\n')[1]); const u = JSON.parse(parsed[0][2])[1]; if (u) return u; } catch (e) { /* ignore */ }
-  throw new Error('Google News ไม่คืนลิงก์ (' + res.length + ' ตัวอักษร)');
+  throw new Error('Google News ไม่คืนลิงก์: ' + res.replace(/\s+/g, ' ').slice(6, 160));
 }
 function pageText_(url) {
   const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': BROWSER_UA_, 'Accept-Language': 'th,en;q=0.8' } });
