@@ -84,6 +84,49 @@ def trends(geo, region, label):
     return out
 
 
+def bing(query, region, label, limit=8, tag=None):
+    """Bing News RSS: ได้ลิงก์จริงของสำนักข่าว (เปิดได้ อ่านเนื้อไปสรุปข่าวย่อได้) แทน Google News ที่ถอดลิงก์ไม่ได้
+    รองรับ "when:Nd" แบบ Google: ตัดออกจากคำค้นแล้วกรองตาม pubDate"""
+    from email.utils import parsedate_to_datetime
+    m = re.search(r"\s*when:(\d+)d", query)
+    days = int(m.group(1)) if m else 3
+    q = re.sub(r"\s*when:\d+d", "", query).strip()
+    u = "https://www.bing.com/news/search?" + urllib.parse.urlencode(
+        {"q": q, "format": "rss", "setlang": "th", "cc": "TH", "qft": 'sortbydate="1"'})
+    root = ET.fromstring(get(u))
+    out, now = [], time.time()
+    for i, it in enumerate(root.iter("item")):
+        title = re.sub(r"\s+", " ", it.findtext("title") or "").strip()
+        link = (it.findtext("link") or "").strip()
+        real = urllib.parse.parse_qs(urllib.parse.urlparse(link).query).get("url", [link])[0]
+        src = next((c.text or "" for c in it if c.tag.endswith("Source")), "") or urllib.parse.urlparse(real).netloc.replace("www.", "")
+        try:
+            if now - parsedate_to_datetime(it.findtext("pubDate")).timestamp() > days * 86400:
+                continue
+        except Exception:
+            pass
+        if not title or not real.startswith("http") or re.search(r"trueid|ทรูไอดี", src + real, re.I):
+            continue
+        desc = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", it.findtext("description") or "")).strip()[:300]
+        out.append(dict(
+            id=mid(region, title), region=region, title=title, source=src, url=real,
+            raw=max(50 - i, 1), metric=label, snippet=desc, tag=tag or q.split(" ")[0],
+        ))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def bing_or_gnews(q, region, label, limit, tag):
+    try:
+        got = bing(q, region, label, limit, tag)
+        if got:
+            return got
+    except Exception as e:
+        print("  bing ล้ม → ใช้ Google News:", type(e).__name__)
+    return gnews(q, region, "th", "TH", "TH:th", label, limit, tag)
+
+
 def gnews(query, region, hl, gl, ceid, label, limit=25, tag=None):
     """Google News RSS ค้นหา (ไม่มีตัวเลขปฏิสัมพันธ์ ใช้ลำดับแทน)"""
     q = urllib.parse.quote(query)
@@ -145,8 +188,8 @@ def reddit(sub, region):
 
 SOURCES = [
     ("trends-TH", lambda: trends("TH", "th", "ไทย")),
-    ("gnews-drama", lambda: gnews("ดราม่า when:1d", "th", "th", "TH", "TH:th", "ข่าวดราม่า")),
-    ("gnews-net", lambda: gnews("ชาวเน็ต when:1d", "th", "th", "TH", "TH:th", "ชาวเน็ตวิจารณ์")),
+    ("news-drama", lambda: bing_or_gnews("ดราม่า when:1d", "th", "ข่าวดราม่า", 25, None)),
+    ("news-net", lambda: bing_or_gnews("ชาวเน็ต when:1d", "th", "ชาวเน็ตวิจารณ์", 25, None)),
     ("trends-US", lambda: trends("US", "world", "สหรัฐฯ")),
     ("trends-GB", lambda: trends("GB", "world", "อังกฤษ")),
     ("trends-IN", lambda: trends("IN", "world", "อินเดีย")),
@@ -185,7 +228,7 @@ NEAR_Q = [
     ("ent", "ดราม่า ดารา when:1d", "ดราม่าบันเทิง"),
     ("ent", "ข่าวบันเทิง when:1d", "ข่าวบันเทิง"),
 ]
-SOURCES += [("gnews-near-" + c + "-" + str(i), (lambda q=q, l=l, c=c: gnews(q, "near", "th", "TH", "TH:th", l, 8, c)))
+SOURCES += [("news-near-" + c + "-" + str(i), (lambda q=q, l=l, c=c: bing_or_gnews(q, "near", l, 8, c)))
             for i, (c, q, l) in enumerate(NEAR_Q)]
 
 
@@ -360,7 +403,7 @@ def article_text(url):
 
 def facts_step():
     try:
-        todo = call("needFacts", [20])
+        todo = call("needFacts", [30])
     except Exception as e:
         print("ขอรายการข่าวย่อล้มเหลว:", str(e)[:100])
         return
