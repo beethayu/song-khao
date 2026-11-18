@@ -363,9 +363,8 @@ def facts_step():
         try:
             if via_g:
                 g_try += 1
-                time.sleep(1)
-            url = resolve_gnews(it["url"]) if via_g else it["url"]
-            text = article_text(url)
+            # ลิงก์ Google News: เครื่อง Actions ถอดไม่ได้ (no-signature) → ส่งว่างให้ Apps Script ถอด+อ่านเอง
+            text = "" if via_g else article_text(it["url"])
             if len(text) >= 200:
                 got += 1
                 g_ok += 1 if via_g else 0

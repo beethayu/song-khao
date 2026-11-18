@@ -334,18 +334,50 @@ function needFacts(limit) {
 }
 
 // text ว่าง = อ่านเนื้อข่าวไม่ได้ ใส่ "-" เพื่อไม่ต้องลองซ้ำ
-// อ่านเนื้อข่าวไม่ได้ (ลิงก์ Google News ฯลฯ) → ให้ Gemini ค้นข่าวเรื่องเดียวกันด้วย Google Search แล้วสรุป
-// คืน '-' ถ้าไม่เจอ/ล้ม (บันทึกสาเหตุล่าสุดไว้ใน Script Properties FACTS_SEARCH_ERR ให้ดูได้)
+// อ่านเนื้อข่าวไม่ได้จากเครื่อง Actions (ลิงก์ Google News โดนบล็อก) → ให้ Apps Script (เครื่อง Google) ถอดลิงก์+อ่านเนื้อเอง แล้วสรุป
+// ไม่ใช้ Gemini ค้นเว็บ (google_search) เพราะโควตาฟรีเป็น 0 (ลองแล้ว 429 2026-11-18)
+// คืน '-' ถ้าไม่ได้ · สาเหตุล่าสุดเก็บใน Script Properties FACTS_SEARCH_ERR
+const BROWSER_UA_ = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+function gnResolve_(url) {
+  const m = /\/(?:rss\/)?articles\/([^?\/#]+)/.exec(url);
+  if (!m) return url;
+  const gid = m[1];
+  const page = UrlFetchApp.fetch('https://news.google.com/rss/articles/' + gid + '?hl=th&gl=TH&ceid=TH:th',
+    { muteHttpExceptions: true, headers: { 'User-Agent': BROWSER_UA_, 'Accept-Language': 'th,en;q=0.8' } }).getContentText();
+  const sg = /data-n-a-sg="([^"]+)"/.exec(page), ts = /data-n-a-ts="([^"]+)"/.exec(page);
+  if (!sg || !ts) throw new Error('ถอดลิงก์ Google News ไม่ได้');
+  const inner = '["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,null,null,0,1],"X","X",1,[1,1,1],1,1,null,0,0,null,0],"' +
+    gid + '",' + ts[1] + ',"' + sg[1] + '"]';
+  const res = UrlFetchApp.fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute', {
+    method: 'post', muteHttpExceptions: true, contentType: 'application/x-www-form-urlencoded;charset=UTF-8',
+    headers: { 'User-Agent': BROWSER_UA_ }, payload: 'f.req=' + encodeURIComponent(JSON.stringify([[['Fbv4je', inner]]]))
+  }).getContentText();
+  const parsed = JSON.parse(res.split('\n\n')[1]);
+  return JSON.parse(parsed[0][2])[1];
+}
+function pageText_(url) {
+  const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': BROWSER_UA_, 'Accept-Language': 'th,en;q=0.8' } });
+  if (r.getResponseCode() !== 200) throw new Error('เว็บข่าวตอบ ' + r.getResponseCode());
+  let h = r.getContentText();
+  const md = /<meta[^>]+(?:property="og:description"|name="description")[^>]+content="([^"]*)"/i.exec(h);
+  h = h.replace(/<(script|style|noscript|nav|footer|header|aside|form|svg)[\s\S]*?<\/\1>/gi, ' ');
+  const ps = [], re = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+  let m;
+  while ((m = re.exec(h)) && ps.length < 80) {
+    const t = m[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#\d+;/g, '').replace(/\s+/g, ' ').trim();
+    if (t.length >= 40) ps.push(t);
+  }
+  return ((md ? md[1] + '\n' : '') + ps.join('\n')).slice(0, 7000);
+}
 function factsSearch_(o) {
-  const d = new Date(Number(o.ts) || Date.now());
-  const q = 'ค้นหาข่าวนี้ด้วย Google Search แล้วเขียนข่าวย่อ\nหัวข้อข่าว: ' + o.title + '\nแหล่งข่าว: ' + (o.source || 'ไม่ระบุ') +
-    '\nวันที่ประมาณ: ' + Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM-dd') +
-    '\nใช้เฉพาะข้อมูลจากข่าวเรื่องเดียวกันนี้ที่ค้นเจอ ห้ามเดาหรือเติมตัวเลข/ชื่อเอง ถ้าค้นไม่เจอข่าวเรื่องนี้ ให้ตอบคำเดียวว่า "ไม่พบ"';
   try {
-    const t = String(gemini_(FACTS_PROMPT, [{ role: 'user', parts: [{ text: q }] }], 0.2, false, [{ google_search: {} }])).trim();
+    const url = /news\.google\.com/.test(o.url) ? gnResolve_(o.url) : o.url;
+    const body = pageText_(url);
+    if (body.length < 200) throw new Error('เนื้อข่าวสั้นเกิน (' + body.length + ')');
+    const q = 'หัวข้อข่าว: ' + (o.title_th || o.title) + '\nแหล่งข่าว: ' + (o.source || 'ไม่ระบุ') + '\n\nเนื้อข่าว:\n' + body;
+    const t = String(gemini_(FACTS_PROMPT, [{ role: 'user', parts: [{ text: q }] }], 0.2)).trim();
     if (t.length >= 25 && t.indexOf('ไม่พบ') !== 0) return t.slice(0, 1800);
-    PropertiesService.getScriptProperties().setProperty('FACTS_SEARCH_ERR', 'ค้นไม่เจอ: ' + t.slice(0, 60));
-    return '-';
+    throw new Error('สรุปไม่ได้: ' + t.slice(0, 40));
   } catch (e) {
     PropertiesService.getScriptProperties().setProperty('FACTS_SEARCH_ERR', String(e.message || e).slice(0, 200));
     return '-';
