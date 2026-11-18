@@ -90,7 +90,10 @@ const FAST_RULE = [
 ].join('\n');
 
 function dr_(o) { return (o.drama === '' || o.drama == null) ? null : Number(o.drama); }
-function rank_(o) { const d = dr_(o); return (d === null ? 4 : d) * 12 + (Number(o.score) || 0); }
+// ผู้ใช้ทำไร่อ้อย → ข่าวอ้อย/น้ำตาลขึ้นก่อน ไม่ถูกตัดด้วยคะแนนดราม่า และเก็บไว้นานกว่า (5 วัน)
+const CANE_RE_ = /อ้อย|น้ำตาล|หีบ|ซี\.?ซี\.?เอส|สอน\.|กอน\.|ชาวไร่/;
+function isCane_(o) { return o.region === 'near' && CANE_RE_.test(String(o.tag || '') + ' ' + String(o.title || '')); }
+function rank_(o) { const d = dr_(o); return (d === null ? 4 : d) * 12 + (Number(o.score) || 0) + (isCane_(o) ? 60 : 0); }
 
 // ---------- API ----------
 function doPost(e) {
@@ -192,10 +195,10 @@ function pub_(o) {
 function list(region, limit) {
   const sh = sheet_();
   const lim = Math.min(Number(limit) || 40, 80);
-  const since = Date.now() - 2 * 24 * 3600 * 1000;
+  const since = Date.now() - 2 * 24 * 3600 * 1000, since5 = Date.now() - 5 * 24 * 3600 * 1000;
   const all = rows_(sh).filter(function (o) {
-    const d = dr_(o);
-    return (!region || o.region === region) && Number(o.ts) >= since && o.title && (d === null || d >= 3);
+    const d = dr_(o), c = isCane_(o);
+    return (!region || o.region === region) && Number(o.ts) >= (c ? since5 : since) && o.title && (c || d === null || d >= 3);
   });
   all.sort(function (a, b) { return rank_(b) - rank_(a); });
   return all.slice(0, lim).map(pub_);
@@ -327,7 +330,7 @@ function needFacts(limit) {
   const since = Date.now() - 2 * 24 * 3600 * 1000;
   const todo = rows_(sh).filter(function (o) {
     const d = dr_(o);
-    return o.title && o.url && !o.facts && Number(o.ts) >= since && d !== null && d >= 5;
+    return o.title && o.url && !o.facts && Number(o.ts) >= since && (isCane_(o) || (d !== null && d >= 5));
   });
   todo.sort(function (a, b) { return rank_(b) - rank_(a); });
   return todo.slice(0, lim).map(function (o) { return { id: o.id, url: o.url, title: o.title }; });
