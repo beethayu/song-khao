@@ -240,3 +240,9 @@ Script ID ใส่ Secret `SCRIPT_ID` + `CLASPRC_JSON` (รูปแบบ toke
 - ผู้ใช้: "ไม่ค่อยโชว์ข่าวย่อ ลิงก์ข่าวบางอันก็เข้าไม่ได้" · ต้นเหตุทั้งคู่คือลิงก์ Google News (ถอดไม่ได้/โดนจำกัดความถี่)
 - ทดสอบจาก Actions: ฟีด RSS ตรงของสำนักไทยส่วนใหญ่ 404/403/XML พัง (ใช้ได้แค่ประชาชาติ, hfocus) · Bing News RSS (`bing.com/news/search?format=rss&setlang=th&cc=TH`) ได้ 11–12 ข่าว/คำค้น ลิงก์จริงอยู่ในพารามิเตอร์ `url=` · อ่านเนื้อได้เกือบหมด ยกเว้น dailynews/thairath/mitihoon (403 จาก Actions → GAS `factsSearch_` อ่านแทน)
 - fetch_news.py `bing()` + `bing_or_gnews()` (Bing ล้ม/ว่าง → Google News เดิม) ใช้กับ NEAR_Q ทั้งหมด + ดราม่า/ชาวเน็ต · `when:Nd` ตัดออกแล้วกรองด้วย pubDate · ตัด TrueID · needFacts 30 ข่าว/รอบ
+
+## v8.8 (2026-11-18 21:30) โพสต์ตรงเข้าเพจ Facebook
+- GAS: `fbSetup(appId, secret, shortToken, pageId)` แลก token สั้น → user token ยาว (fb_exchange_token) → `me/accounts` → เก็บ Page token (ไม่หมดอายุ) + ชื่อ/ID เพจใน Script Properties (`FB_PAGE_*`) · มีหลายเพจ → คืน `{choose:[…]}` ให้เว็บเลือก (เก็บ FB_USER_TOKEN ชั่วคราว) · App Secret ไม่ถูกเก็บ · `fbStatus`, `fbDisconnect`, `fbPost(id, caption, b64, mime)` → POST /{page}/photos (source+caption) · กันโพสต์ซ้ำด้วย `FB_POSTED_<id>` · error 190 = ให้เชื่อมเพจใหม่ · Graph URL ไม่ใส่เวอร์ชัน (ใช้ค่าเริ่มต้นของแอป)
+- เว็บ: การ์ด "เพจ Facebook" ในตั้งค่า (App ID / App Secret / Access Token → เชื่อมเพจ) · ใต้ภาพโพสต์: ปุ่มสีฟ้า "โพสต์เข้าเพจ <ชื่อ>" แตะ 2 ครั้ง (ครั้งแรกเปลี่ยนเป็นแดง "แตะอีกครั้งเพื่อโพสต์เลย" 5 วิ) → ส่งภาพ JPEG 0.92 + postText → แถบเขียว "✓ โพสต์เข้าเพจแล้ว · ดูโพสต์" (เก็บ `sk_fbposted`) · ข่าวที่เก็บไว้เปลี่ยนสถานะเป็น "โพสต์แล้ว" เอง · เชื่อมเพจแล้วซ่อนปุ่ม "ส่งไปเฟซบุ๊ก" (แผ่นแชร์)
+- `privacy.html` = นโยบายความเป็นส่วนตัวสำหรับใส่ในแอป Meta (ต้องมีถึงจะสลับโหมด Live ได้)
+- ทดสอบ playwright กับ API จำลอง: เชื่อมเพจ (เลือก 1 จาก 2) → โพสต์ 2 แตะ → แถบเขียว ไม่มี error · **ยังไม่ได้ทดสอบกับ Facebook จริง** รอผู้ใช้สร้างแอป Meta

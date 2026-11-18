@@ -107,6 +107,7 @@ body[data-tab=chat] #comp{display:flex}
 .cat.on{background:var(--pri);color:#fff}
 .cat i{font-style:normal;opacity:.65;font-size:12px;margin-left:4px}
 .nofx{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--bg);font-size:14px;color:var(--mut)}
+.fbb{background:#1877f2!important;color:#fff!important}.btn.warn{background:#d93025;color:#fff}.fbok{margin-top:12px;padding:10px 12px;border-radius:12px;background:#e8f5ec;color:#17733a;font-weight:600;font-size:14px}.fbok a{color:inherit}
 #updBar{position:fixed;left:12px;right:12px;bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 12px);z-index:41;border:0;border-radius:14px;background:var(--pri);color:#fff;font-weight:700;font-size:15px;padding:12px 14px;box-shadow:0 6px 18px rgba(0,0,0,.25);font-family:inherit}
 #toast{position:fixed;left:16px;right:16px;bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 12px);background:rgba(27,42,51,.94);color:#fff;font-size:13px;padding:10px 14px;border-radius:12px;z-index:40;display:none;text-align:center}
 body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 70px)}
@@ -136,8 +137,8 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='8.7 · 2026-11-18';
-var WHATSNEW='ไม่เอาข่าวจาก TrueID (อ่านเต็มไม่ได้)';
+var VERSION='8.8 · 2026-11-18';
+var WHATSNEW='โพสต์ตรงเข้าเพจ Facebook (ตั้งค่าในหน้าตั้งค่า)';
 var CLIP=false; // ปิดลุงเล่า+คำสั่งทำคลิป (ผู้ใช้ไม่ว่างทำคลิป 2026-11-15) เปลี่ยนเป็น true เพื่อเปิดกลับ
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
@@ -306,7 +307,7 @@ function itemHtml(it,i,hot,extra){
     if(S.posting[it.id])b+='<div class="load">กำลังทำโพสต์…</div>';
     else if(S.post[it.id]){var p=S.post[it.id],I=esc(it.id);
       b+='<img class="pimg" src="'+postImg(p,it)+'" alt="การ์ดภาพ"><div class="note">กดค้างที่ภาพ → บันทึกรูป</div>'+
-        '<div class="acts">'+(CANSH?'<button class="btn pri" data-act="share" data-id="'+I+'">ส่งไปเฟซบุ๊ก</button>':'')+'<button class="btn'+(CANSH?'':' pri')+'" data-act="cpost" data-id="'+I+'">คัดลอกข้อความ</button><button class="btn" data-act="post" data-id="'+I+'">ทำใหม่</button></div>'+
+        fbRow(it.id)+'<div class="acts">'+(!FB.name&&CANSH?'<button class="btn pri" data-act="share" data-id="'+I+'">ส่งไปเฟซบุ๊ก</button>':'')+'<button class="btn'+(!FB.name&&!CANSH?' pri':'')+'" data-act="cpost" data-id="'+I+'">คัดลอกข้อความ</button><button class="btn" data-act="post" data-id="'+I+'">ทำใหม่</button></div>'+
         '<div class="bgbox"><div class="bgh">อยากได้ภาพพื้นหลังสวย ๆ</div>'+
         '<div class="acts" style="margin-top:6px"><button class="btn" data-act="cbg" data-id="'+I+'">① คัดลอกคำสั่งไปวางใน Gemini</button>'+
         '<button class="btn" data-act="bg" data-id="'+I+'">② เลือกภาพที่ได้</button>'+(BG[it.id]?'<button class="btn" data-act="bgx" data-id="'+I+'">เอาภาพออก</button>':'')+'</div></div>'+
@@ -376,6 +377,15 @@ function chatHtml(){
   if(S.chatErr)h+='<div class="b a err">'+esc(S.chatErr)+' (ข้อความเดิมอยู่ในช่องพิมพ์ กดส่งใหม่ได้)</div>';
   return h;
 }
+function fbSetHtml(){
+  if(FB.name)return '<div class="card pad"><div class="h2">เพจ Facebook</div><div class="hint" style="margin-bottom:10px">เชื่อมกับเพจ <b>'+esc(FB.name)+'</b> แล้ว · ใต้ภาพโพสต์จะมีปุ่ม "โพสต์เข้าเพจ"</div><button class="btn" data-act="fboff">ยกเลิกการเชื่อมเพจ</button></div>';
+  if(S.fbChoose)return '<div class="card pad"><div class="h2">เลือกเพจที่จะโพสต์</div><div class="acts">'+S.fbChoose.map(function(p){return '<button class="btn" data-act="fbsetup" data-p="'+esc(p.id)+'">'+esc(p.name)+'</button>'}).join('')+'</div></div>';
+  return '<div class="card pad"><div class="h2">เพจ Facebook (โพสต์ตรงเข้าเพจ)</div><div class="hint" style="margin-bottom:10px">ทำตามขั้นตอนที่ Claude ให้ไว้ แล้ววาง 3 ค่านี้ (รหัสเก็บในหลังบ้านเท่านั้น ไม่เก็บในเครื่อง)</div>'+
+    '<div class="row"><label>App ID</label><input id="fba" inputmode="numeric" autocapitalize="off" autocorrect="off" spellcheck="false"></div>'+
+    '<div class="row"><label>App Secret</label><input id="fbs" autocapitalize="off" autocorrect="off" spellcheck="false"></div>'+
+    '<div class="row"><label>Access Token</label><input id="fbt" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="EAA…"></div>'+
+    '<div class="acts"><button class="btn pri" data-act="fbsetup">เชื่อมเพจ</button></div></div>';
+}
 function setHtml(){
   var c=cfg();
   return '<div class="card"><div class="row"><label>API URL</label><input id="cu" value="'+esc(c.url)+'" placeholder="https://script.google.com/…" autocapitalize="off" autocorrect="off" spellcheck="false"></div><div class="row"><label>API KEY</label><input id="ck" type="password" value="'+esc(c.key)+'" placeholder="รหัสที่ตั้งไว้" autocapitalize="off" autocorrect="off"></div></div>'+
@@ -385,6 +395,7 @@ function setHtml(){
   '<div class="card pad"><div class="h2">ลุงประจำหมวด (ทำครั้งเดียว)</div><div class="hint" style="margin-bottom:8px">กดคัดลอก → เปิด Gemini → แนบภาพลุงปัจจุบัน → วาง → บันทึกภาพไว้อัลบั้ม "ลุง" · หน้าเดิม เปลี่ยนแค่ชุด · ตอนทำคลิปแอปจะบอกว่าข่าวนี้ใช้ชุดไหน</div><div class="acts" style="flex-wrap:wrap">'+
     Object.keys(OUTFIT).map(function(c){return '<button class="btn" data-act="coutfit" data-c="'+c+'">ชุด'+OUTFIT[c][0]+'</button>'}).join('')+
     '<button class="btn" data-act="csheet">Character Sheet (ภาพหลายมุมไว้อ้างอิง)</button></div></div>':'')+
+  fbSetHtml()+
   '<div class="card pad"><div class="h2">เครื่องมือ</div><div class="acts"><button class="btn" data-act="size">เช็คพื้นที่เครื่อง</button><button class="btn" data-act="hist">ดูประวัติโพสต์ ('+Object.keys(S.post).length+')</button></div><div class="note" id="sizeOut" style="margin-top:10px;color:var(--mut)"></div></div>'+
   '<div class="card pad"><div class="h2">ข้อมูลในเครื่อง</div><div class="hint" style="margin-bottom:10px">ข่าวที่เก็บไว้ '+S.saved.length+' · ข้อความแชท '+S.chat.length+'</div><button class="btn" data-act="wipe">'+(S.wipeArm?'แตะอีกครั้งเพื่อยืนยันล้าง':'ล้างข้อมูลในเครื่อง')+'</button></div>'+
   '<div class="card pad" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><div class="h2" style="margin-bottom:2px">เวอร์ชันแอป</div><div class="hint">'+esc(VERSION)+(WHATSNEW?'<br>ล่าสุด: '+esc(WHATSNEW):'')+'</div></div><button class="btn pri" id="ckupd" data-act="ckupd" style="flex:none">เช็กอัปเดต</button></div>';
@@ -641,6 +652,15 @@ var ICON={
 };
 function clampL(ls,n){if(ls.length<=n)return ls;ls=ls.slice(0,n);ls[n-1]=ls[n-1].replace(/\s*\S{0,2}$/,'')+'…';return ls}
 function rr(x,a,b,w,h,r){r=Math.min(r,w/2,h/2);x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath()}
+var FB=LS.get('sk_fb',{}),FBP=LS.get('sk_fbposted',{}),S_FB={};
+function fbRow(id){
+  if(!FB.name)return '';
+  var I=esc(id);
+  if(FBP[id])return '<div class="fbok">✓ โพสต์เข้าเพจ '+esc(FB.name)+' แล้ว · <a href="'+esc(FBP[id])+'" target="_blank" rel="noopener">ดูโพสต์</a></div>';
+  if(S_FB[id]==='busy')return '<div class="load">กำลังโพสต์เข้าเพจ…</div>';
+  return '<div class="acts"><button class="btn '+(S_FB[id]==='arm'?'warn':'fbb')+'" data-act="fbpost" data-id="'+I+'">'+(S_FB[id]==='arm'?'แตะอีกครั้งเพื่อโพสต์เลย':'โพสต์เข้าเพจ '+esc(FB.name))+'</button></div>';
+}
+function jpegB64(p,it){return new Promise(function(ok){var im=new Image();im.onload=function(){var c=document.createElement('canvas');c.width=im.width;c.height=im.height;var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0);ok(c.toDataURL('image/jpeg',.92).split(',')[1])};im.src=postImg(p,it)})}
 var BG={},BGN={},CANSH=!!(navigator.canShare&&navigator.share&&window.File);
 function rgba(h,a){return 'rgba('+parseInt(h.slice(1,3),16)+','+parseInt(h.slice(3,5),16)+','+parseInt(h.slice(5,7),16)+','+a+')'}
 function thDate(ts){var d=new Date(Number(ts));if(!ts||isNaN(d))return '';return d.getDate()+' '+['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][d.getMonth()]+' '+String(d.getFullYear()+543).slice(-2)}
@@ -820,6 +840,26 @@ var ACT={
   }).catch(function(){toast('คัดลอกไม่ได้')})},
   cimg:function(id,btn){var p=S.post[id];if(!p||!p.head)return;clip(imgPromptOf(p)).then(function(){btn.textContent='คัดลอกแล้ว ✓ ไปวางใน Gemini/ChatGPT';setTimeout(function(){btn.textContent='คัดลอกคำสั่งสร้างภาพ'},2500)}).catch(function(){toast('คัดลอกไม่ได้')})},
   cpost:function(id,btn){var p=S.post[id];if(!p)return;clip(postText(p)).then(function(){btn.textContent='คัดลอกแล้ว ✓';setTimeout(function(){btn.textContent='คัดลอกโพสต์'},1500)},function(){toast('คัดลอกไม่ได้ ลองกดค้างที่ข้อความ')})},
+  fbpost:async function(id){
+    if(S_FB[id]!=='arm'){S_FB[id]='arm';render(true);setTimeout(function(){if(S_FB[id]==='arm'){delete S_FB[id];render(true)}},5000);return}
+    var p=S.post[id],it=find(id);if(!p)return;
+    S_FB[id]='busy';render(true);
+    try{var b=await jpegB64(p,it),r=await api('fbPost',[id,postText(p),b,'image/jpeg'],120000);
+      FBP[id]=r.url;LS.set('sk_fbposted',FBP);toast(r.again?'ข่าวนี้เคยโพสต์ไปแล้ว':'โพสต์เข้าเพจแล้ว ✓');
+      if(isSaved(id))ACT.updSave(id,'status','done');}
+    catch(e){toast(String(e.message||e).slice(0,140))}
+    delete S_FB[id];render(true);
+  },
+  fbsetup:async function(id,btn){
+    var a=($('#fba')||{}).value||'',s=($('#fbs')||{}).value||'',t=($('#fbt')||{}).value||'',pg=btn.getAttribute('data-p')||'';
+    if(!pg&&(!a.trim()||!s.trim()||!t.trim())){toast('ใส่ให้ครบ 3 ช่อง');return}
+    btn.disabled=true;btn.textContent='กำลังเชื่อม…';
+    try{var r=await api('fbSetup',pg?['','','',pg]:[a,s,t,''],60000);
+      if(r.choose){S.fbChoose=r.choose;render(true);return}
+      FB={name:r.name,id:r.id};LS.set('sk_fb',FB);S.fbChoose=null;toast('เชื่อมเพจ '+r.name+' แล้ว');render(true)}
+    catch(e){toast(String(e.message||e).slice(0,160));btn.disabled=false;btn.textContent='เชื่อมเพจ'}
+  },
+  fboff:async function(){if(!confirm('ยกเลิกการเชื่อมเพจ?'))return;try{await api('fbDisconnect',[],30000)}catch(e){}FB={};LS.set('sk_fb',FB);render(true)},
   share:function(id){
     var p=S.post[id],it=find(id);if(!p)return;
     var d=postImg(p,it),b=atob(d.split(',')[1]),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);

@@ -134,7 +134,11 @@ const API = {
   makePost: makePost,
   chat: chat,
   getGroupRealEstate: getGroupRealEstate,
-  getPagePosts: getPagePosts
+  getPagePosts: getPagePosts,
+  fbSetup: fbSetup,
+  fbStatus: fbStatus,
+  fbDisconnect: fbDisconnect,
+  fbPost: fbPost
 };
 
 // ใช้ครั้งเดียวในหน้า Apps Script: ขอสิทธิ์ + สร้างชีต
@@ -815,4 +819,63 @@ function pageName_(post, url) {
   if (n) return String(n).slice(0, 60);
   const m = String(url).match(/facebook\.com\/(?:profile\.php\?id=)?([^/?#]+)/i);
   return m ? decodeURIComponent(m[1]) : 'Facebook';
+}
+
+// ---------- โพสต์เข้าเพจ Facebook (Pages API ฟรี: เพจของตัวเอง ไม่ต้อง App Review แต่แอป Meta ต้องอยู่โหมด Live) ----------
+// ตั้งค่าครั้งเดียวจากหน้าตั้งค่าในแอป: App ID + App Secret + User token สั้นจาก Graph API Explorer
+// → แลกเป็น user token ยาว → ขอ Page token (ไม่หมดอายุ) → เก็บใน Script Properties เท่านั้น (ไม่ลงชีต ไม่ส่งกลับเว็บ)
+const FBG_ = 'https://graph.facebook.com/';
+function fbGet_(path, q) {
+  const qs = Object.keys(q).map(function (k) { return k + '=' + encodeURIComponent(q[k]); }).join('&');
+  const r = UrlFetchApp.fetch(FBG_ + path + '?' + qs, { muteHttpExceptions: true });
+  const j = JSON.parse(r.getContentText() || '{}');
+  if (j.error) throw new Error('Facebook: ' + (j.error.message || 'ผิดพลาด').slice(0, 160));
+  return j;
+}
+function fbSetup(appId, secret, shortTok, pageId) {
+  const P = PropertiesService.getScriptProperties();
+  let longTok = P.getProperty('FB_USER_TOKEN');
+  if (shortTok) {
+    longTok = fbGet_('oauth/access_token', { grant_type: 'fb_exchange_token', client_id: String(appId).trim(), client_secret: String(secret).trim(), fb_exchange_token: String(shortTok).trim() }).access_token;
+    P.setProperty('FB_USER_TOKEN', longTok);
+  }
+  if (!longTok) throw new Error('ยังไม่ได้ใส่ token');
+  const pages = (fbGet_('me/accounts', { fields: 'id,name,access_token,tasks', limit: 50, access_token: longTok }).data || [])
+    .filter(function (p) { return !p.tasks || p.tasks.indexOf('CREATE_CONTENT') >= 0; });
+  if (!pages.length) throw new Error('ไม่เจอเพจ ตอนกด Generate Access Token ต้องติ๊กเลือกเพจด้วย');
+  const pg = pageId ? pages.filter(function (p) { return p.id === String(pageId); })[0] : (pages.length === 1 ? pages[0] : null);
+  if (!pg) return { choose: pages.map(function (p) { return { id: p.id, name: p.name }; }) };
+  P.setProperties({ FB_PAGE_ID: pg.id, FB_PAGE_NAME: pg.name, FB_PAGE_TOKEN: pg.access_token });
+  P.deleteProperty('FB_USER_TOKEN');
+  return { name: pg.name, id: pg.id };
+}
+function fbStatus() {
+  const P = PropertiesService.getScriptProperties();
+  return P.getProperty('FB_PAGE_TOKEN') ? { name: P.getProperty('FB_PAGE_NAME'), id: P.getProperty('FB_PAGE_ID') } : null;
+}
+function fbDisconnect() {
+  const P = PropertiesService.getScriptProperties();
+  ['FB_PAGE_ID', 'FB_PAGE_NAME', 'FB_PAGE_TOKEN', 'FB_USER_TOKEN'].forEach(function (k) { P.deleteProperty(k); });
+  return true;
+}
+// โพสต์ภาพ + ข้อความ · กันโพสต์ซ้ำด้วย FB_POSTED_<id>
+function fbPost(id, caption, b64, mime) {
+  const P = PropertiesService.getScriptProperties();
+  const tok = P.getProperty('FB_PAGE_TOKEN'), pid = P.getProperty('FB_PAGE_ID');
+  if (!tok) throw new Error('ยังไม่ได้เชื่อมเพจ (ไปที่ตั้งค่า)');
+  const done = P.getProperty('FB_POSTED_' + id);
+  if (done) return { post_id: done, url: 'https://www.facebook.com/' + done, again: true };
+  const blob = Utilities.newBlob(Utilities.base64Decode(String(b64)), mime || 'image/jpeg', 'songkhao.jpg');
+  const r = UrlFetchApp.fetch(FBG_ + pid + '/photos', {
+    method: 'post', muteHttpExceptions: true,
+    payload: { source: blob, caption: String(caption || '').slice(0, 5000), published: 'true', access_token: tok }
+  });
+  const j = JSON.parse(r.getContentText() || '{}');
+  if (j.error) {
+    if (j.error.code === 190) throw new Error('สิทธิ์เพจหมดอายุ ไปที่ตั้งค่าแล้วเชื่อมเพจใหม่');
+    throw new Error('Facebook: ' + String(j.error.message || '').slice(0, 160));
+  }
+  const post = j.post_id || (pid + '_' + j.id);
+  P.setProperty('FB_POSTED_' + id, post);
+  return { post_id: post, url: 'https://www.facebook.com/' + post };
 }
