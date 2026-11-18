@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <rect width="180" height="180" fill="#12384A"/>
+  <circle cx="90" cy="92" r="70" fill="#174659"/>
+  <!-- หนังสือพิมพ์ -->
+  <g transform="rotate(-8 74 98)">
+    <rect x="26" y="52" width="84" height="98" rx="8" fill="#DCE6EA"/>
+    <rect x="22" y="48" width="84" height="98" rx="8" fill="#FFFFFF"/>
+    <rect x="32" y="60" width="64" height="12" rx="3" fill="#12384A"/>
+    <rect x="32" y="80" width="28" height="24" rx="3" fill="#FF7A1A"/>
+    <g fill="#B9C7CE">
+      <rect x="66" y="81" width="30" height="5" rx="2.5"/>
+      <rect x="66" y="91" width="30" height="5" rx="2.5"/>
+      <rect x="66" y="101" width="22" height="5" rx="2.5"/>
+      <rect x="32" y="114" width="64" height="5" rx="2.5"/>
+      <rect x="32" y="124" width="64" height="5" rx="2.5"/>
+      <rect x="32" y="134" width="44" height="5" rx="2.5"/>
+    </g>
+  </g>
+  <!-- โทรโข่ง -->
+  <g transform="translate(80 70) rotate(-14 40 40) scale(0.78)">
+    <rect x="0" y="34" width="20" height="28" rx="7" fill="#E85F08"/>
+    <path d="M16 30 L70 6 Q76 4 76 10 L76 86 Q76 92 70 90 L16 66 Z" fill="#FF7A1A"/>
+    <path d="M16 30 L70 6 Q76 4 76 10 L76 34 L16 46 Z" fill="#FF9A4D"/>
+    <ellipse cx="76" cy="48" rx="8" ry="42" fill="#FFC24D"/>
+    <rect x="24" y="64" width="13" height="26" rx="5" fill="#E85F08" transform="rotate(-12 30 64)"/>
+  </g>
+  <!-- คลื่นเสียง -->
+  <g fill="none" stroke="#FFD24D" stroke-width="7" stroke-linecap="round">
+    <path d="M146 46 Q155 62 152 80"/>
+    <path d="M158 34 Q171 60 164 90"/>
+  </g>
+</svg>

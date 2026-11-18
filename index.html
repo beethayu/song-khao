@@ -8,6 +8,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="ส่งข่าว">
+<link rel="apple-touch-icon" href="icon.png?v=1">
+<link rel="icon" href="icon.png?v=1">
 <title>ส่งข่าว</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -104,6 +106,7 @@ body[data-tab=chat] #comp{display:flex}
 .cat{flex:none;height:34px;padding:0 14px;border-radius:17px;background:#fff;color:var(--pri);font-weight:600;font-size:14px;white-space:nowrap}
 .cat.on{background:var(--pri);color:#fff}
 .cat i{font-style:normal;opacity:.65;font-size:12px;margin-left:4px}
+#updBar{position:fixed;left:12px;right:12px;bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 12px);z-index:41;border:0;border-radius:14px;background:var(--pri);color:#fff;font-weight:700;font-size:15px;padding:12px 14px;box-shadow:0 6px 18px rgba(0,0,0,.25);font-family:inherit}
 #toast{position:fixed;left:16px;right:16px;bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 12px);background:rgba(27,42,51,.94);color:#fff;font-size:13px;padding:10px 14px;border-radius:12px;z-index:40;display:none;text-align:center}
 body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 70px)}
 </style>
@@ -132,7 +135,8 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='8.4 · 2026-11-15';
+var VERSION='8.5 · 2026-11-18';
+var WHATSNEW='ไอคอนใหม่ · แจ้งเมื่อมีเวอร์ชันใหม่';
 var CLIP=false; // ปิดลุงเล่า+คำสั่งทำคลิป (ผู้ใช้ไม่ว่างทำคลิป 2026-11-15) เปลี่ยนเป็น true เพื่อเปิดกลับ
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
@@ -379,7 +383,7 @@ function setHtml(){
     '<button class="btn" data-act="csheet">Character Sheet (ภาพหลายมุมไว้อ้างอิง)</button></div></div>':'')+
   '<div class="card pad"><div class="h2">เครื่องมือ</div><div class="acts"><button class="btn" data-act="size">เช็คพื้นที่เครื่อง</button><button class="btn" data-act="hist">ดูประวัติโพสต์ ('+Object.keys(S.post).length+')</button></div><div class="note" id="sizeOut" style="margin-top:10px;color:var(--mut)"></div></div>'+
   '<div class="card pad"><div class="h2">ข้อมูลในเครื่อง</div><div class="hint" style="margin-bottom:10px">ข่าวที่เก็บไว้ '+S.saved.length+' · ข้อความแชท '+S.chat.length+'</div><button class="btn" data-act="wipe">'+(S.wipeArm?'แตะอีกครั้งเพื่อยืนยันล้าง':'ล้างข้อมูลในเครื่อง')+'</button></div>'+
-  '<div class="note" style="text-align:center">ส่งข่าว · เวอร์ชัน '+VERSION+'</div>';
+  '<div class="card pad" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><div class="h2" style="margin-bottom:2px">เวอร์ชันแอป</div><div class="hint">'+esc(VERSION)+(WHATSNEW?'<br>ล่าสุด: '+esc(WHATSNEW):'')+'</div></div><button class="btn pri" id="ckupd" data-act="ckupd" style="flex:none">เช็กอัปเดต</button></div>';
 }
 function catsHtml(){
   return '<div class="cats">'+CATS.map(function(c){
@@ -880,6 +884,7 @@ var ACT={
     catch(e){S.tst={t:e.message,c:'var(--bad)'}}
     render(true);
   },
+  ckupd:function(id,btn){updLast=0;btn.textContent='กำลังเช็ก…';checkUpdate()},
   wipe:function(){
     if(!S.wipeArm){S.wipeArm=true;render(true);return}
     ['sk_news','sk_saved','sk_chat','sk_tab','sk_re','sk_reUrl','sk_pg'].forEach(function(k){try{localStorage.removeItem(k)}catch(e){}});
@@ -926,17 +931,32 @@ $('#snd').addEventListener('click',function(){send($('#msg').value)});
 $('#msg').addEventListener('input',grow);
 
 function hash(t){var h=5381;for(var i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return String(h)}
-async function checkUpdate(){
-  var ae=document.activeElement;
-  if(S.busy||S.sending||S.loading||(ae&&/^(INPUT|TEXTAREA)$/.test(ae.tagName)&&ae.value))return;
-  try{
-    var r=await fetch(location.pathname+'?_='+Date.now(),{cache:'no-store'});
-    if(!r.ok)return;
-    var h=hash(await r.text()),prev=LS.get('sk_hash',null);
-    LS.set('sk_hash',h);
-    if(prev&&prev!==h)location.reload();
-  }catch(e){}
+// เช็กเวอร์ชันใหม่ (แบบไร่อ้อย): เปิด/กลับเข้าแอป/ทุก 10 นาที ดึง index.html แบบ no-store เทียบ VERSION
+// ห้ามโหลดใหม่ระหว่างรอ API/ทำโพสต์/กำลังพิมพ์ → ขึ้นแถบให้แตะเอง แล้วลองใหม่ทุก 15 วิ
+var updNew='',updChecking=false,updLast=0;
+function updBusy(){var a=document.activeElement;return S.busy||S.sending||S.loading||Object.keys(S.posting).length||(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))}
+function updBar(){var b=document.getElementById('updBar');if(!updNew){if(b)b.remove();return}
+  if(!b){b=document.createElement('button');b.id='updBar';b.type='button';b.onclick=function(){updGo(true)};document.body.appendChild(b)}
+  b.innerHTML='✨ มีเวอร์ชันใหม่ ('+esc(updNew.split(' ')[0])+') · <u>แตะเพื่อโหลด</u>'}
+function updGo(force){
+  if(!updNew)return;
+  if(!force&&updBusy()){updBar();return setTimeout(function(){updGo(false)},15000)}
+  try{sessionStorage.setItem('sk_upd_from',VERSION)}catch(e){}
+  toast('✨ กำลังโหลดเวอร์ชันใหม่…');
+  setTimeout(function(){location.replace(location.pathname+'?v='+encodeURIComponent(updNew.split(' ')[0])+location.hash)},400);
 }
+function checkUpdate(){
+  if(location.protocol==='file:'||updChecking||document.hidden||Date.now()-updLast<20000)return;
+  updChecking=true;updLast=Date.now();
+  fetch(location.pathname+'?_='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(h){
+    var m=/var VERSION='([^']+)'/.exec(h);
+    if(m&&m[1]!==VERSION){updNew=m[1];updGo(false)}
+  }).catch(function(){}).finally(function(){updChecking=false;var b=document.getElementById('ckupd');if(b)b.textContent=updNew?'มีใหม่ กำลังโหลด…':'ล่าสุดแล้ว ✓'});
+}
+setInterval(checkUpdate,600000);
+window.addEventListener('pageshow',function(){setTimeout(checkUpdate,1500)});
+(function(){var from='';try{from=sessionStorage.getItem('sk_upd_from')||'';sessionStorage.removeItem('sk_upd_from')}catch(e){}
+  if(from&&from!==VERSION)setTimeout(function(){toast('✅ อัปเดตแล้ว · เวอร์ชัน '+VERSION.split(' ')[0]+(WHATSNEW?' — '+WHATSNEW:''))},800)})();
 document.addEventListener('visibilitychange',function(){
   if(document.visibilityState!=='visible')return;
   checkUpdate();
