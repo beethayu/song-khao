@@ -106,6 +106,7 @@ body[data-tab=chat] #comp{display:flex}
 .cat{flex:none;height:34px;padding:0 14px;border-radius:17px;background:#fff;color:var(--pri);font-weight:600;font-size:14px;white-space:nowrap}
 .cat.on{background:var(--pri);color:#fff}
 .cat i{font-style:normal;opacity:.65;font-size:12px;margin-left:4px}
+.nofx{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--bg);font-size:14px;color:var(--mut)}
 #updBar{position:fixed;left:12px;right:12px;bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 12px);z-index:41;border:0;border-radius:14px;background:var(--pri);color:#fff;font-weight:700;font-size:15px;padding:12px 14px;box-shadow:0 6px 18px rgba(0,0,0,.25);font-family:inherit}
 #toast{position:fixed;left:16px;right:16px;bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 12px);background:rgba(27,42,51,.94);color:#fff;font-size:13px;padding:10px 14px;border-radius:12px;z-index:40;display:none;text-align:center}
 body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 70px)}
@@ -135,8 +136,8 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='8.5 · 2026-11-18';
-var WHATSNEW='ไอคอนใหม่ · แจ้งเมื่อมีเวอร์ชันใหม่';
+var VERSION='8.6 · 2026-11-18';
+var WHATSNEW='ปุ่มสรุปข่าวนี้ สำหรับข่าวที่ยังไม่มีข่าวย่อ';
 var CLIP=false; // ปิดลุงเล่า+คำสั่งทำคลิป (ผู้ใช้ไม่ว่างทำคลิป 2026-11-15) เปลี่ยนเป็น true เพื่อเปิดกลับ
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
@@ -156,7 +157,7 @@ var S={
   pgUrl:LS.get('sk_pgUrl',''),pgLoading:false,
   saved:LS.get('sk_saved',[]),
   chat:LS.get('sk_chat',[]),
-  ctx:null,tst:{t:'',c:''},busy:0,open:{},retelling:{},posting:{},post:LS.get('sk_post',{}),loading:false,sending:false,chatErr:'',wipeArm:false,reLoading:false,delArm:'',vidOpen:{},vgreen:LS.get('sk_vgreen',true),
+  ctx:null,tst:{t:'',c:''},busy:0,open:{},retelling:{},posting:{},facting:{},post:LS.get('sk_post',{}),loading:false,sending:false,chatErr:'',wipeArm:false,reLoading:false,delArm:'',vidOpen:{},vgreen:LS.get('sk_vgreen',true),
   vchar:LS.get('sk_vchar',''),csafe:LS.get('sk_csafe',{}),safing:{}
 };
 // หมวดในแท็บข่าว (เลื่อนซ้ายขวาได้)
@@ -294,7 +295,9 @@ async function loadRealEstate(){
 function itemHtml(it,i,hot,extra){
   var op=!!S.open[it.id],b='';
   if(op){
-    var fx=it.facts?'<div class="lh">ข่าวย่อ (สรุปจากแหล่งข่าว)</div><div class="facts">'+esc(it.facts)+'</div>':'';
+    var fx=it.facts&&it.facts!=='-'?'<div class="lh">ข่าวย่อ (สรุปจากแหล่งข่าว)</div><div class="facts">'+esc(it.facts)+'</div>':
+      S.facting[it.id]?'<div class="load">กำลังหาข่าวย่อ… (ประมาณ 10–20 วิ)</div>':
+      '<div class="nofx"><span>ยังไม่มีข่าวย่อ</span><button class="btn" data-act="fxnow" data-id="'+esc(it.id)+'">สรุปข่าวนี้</button></div>';
     if(S.retelling[it.id])b+=fx+'<div class="load">ลุงกำลังค้นข่าวและเล่า…</div>';
     else if(CLIP&&it.lung)b+=fx+'<div class="lh">ลุงเล่า</div><div class="lung">'+esc(it.lung)+'</div>';
     else b+=fx||(CLIP?'<div class="note">ลุงยังไม่ได้เล่าข่าวนี้</div>':'');
@@ -884,6 +887,12 @@ var ACT={
     catch(e){S.tst={t:e.message,c:'var(--bad)'}}
     render(true);
   },
+  fxnow:async function(id){
+    S.facting[id]=1;render(true);
+    try{var f=await api('factsNow',[id],120000),it=find(id);if(it)it.facts=f;LS.set('sk_news',S.news);toast('ได้ข่าวย่อแล้ว')}
+    catch(e){toast(String(e.message||e).slice(0,120))}
+    delete S.facting[id];render(true);
+  },
   ckupd:function(id,btn){updLast=0;btn.textContent='กำลังเช็ก…';checkUpdate()},
   wipe:function(){
     if(!S.wipeArm){S.wipeArm=true;render(true);return}
@@ -934,7 +943,7 @@ function hash(t){var h=5381;for(var i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(
 // เช็กเวอร์ชันใหม่ (แบบไร่อ้อย): เปิด/กลับเข้าแอป/ทุก 10 นาที ดึง index.html แบบ no-store เทียบ VERSION
 // ห้ามโหลดใหม่ระหว่างรอ API/ทำโพสต์/กำลังพิมพ์ → ขึ้นแถบให้แตะเอง แล้วลองใหม่ทุก 15 วิ
 var updNew='',updChecking=false,updLast=0;
-function updBusy(){var a=document.activeElement;return S.busy||S.sending||S.loading||Object.keys(S.posting).length||(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))}
+function updBusy(){var a=document.activeElement;return S.busy||S.sending||S.loading||Object.keys(S.posting).length||Object.keys(S.facting).length||(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))}
 function updBar(){var b=document.getElementById('updBar');if(!updNew){if(b)b.remove();return}
   if(!b){b=document.createElement('button');b.id='updBar';b.type='button';b.onclick=function(){updGo(true)};document.body.appendChild(b)}
   b.innerHTML='✨ มีเวอร์ชันใหม่ ('+esc(updNew.split(' ')[0])+') · <u>แตะเพื่อโหลด</u>'}

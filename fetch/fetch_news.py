@@ -270,8 +270,10 @@ BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 
 
 def fetch_html(url, timeout=15, limit=1_500_000):
-    req = urllib.request.Request(url, headers={
-        "User-Agent": BROWSER_UA, "Accept": "text/html,*/*", "Accept-Language": "th,en;q=0.8"})
+    h = {"User-Agent": BROWSER_UA, "Accept": "text/html,*/*", "Accept-Language": "th,en;q=0.8"}
+    if "google.com" in url:  # เครื่อง Actions อยู่ยุโรป/อเมริกา โดนหน้ายินยอมคุกกี้ ส่งคุกกี้ยินยอมไปด้วย
+        h["Cookie"] = "CONSENT=YES+cb.20240101-00-p0.th+FX+000; SOCS=CAESHAgBEhJnd3NfMjAyNDAxMDEtMF9SQzIaAnRoIAEaBgiAo_CsBg"
+    req = urllib.request.Request(url, headers=h)
     with urllib.request.urlopen(req, timeout=timeout) as r:
         raw = r.read(limit)
         cs = r.headers.get_content_charset() or "utf-8"
@@ -291,7 +293,7 @@ def resolve_gnews(url):
             return mm.group(0)
     except Exception:
         pass
-    page = fetch_html(f"https://news.google.com/articles/{gid}", limit=600_000)
+    page = fetch_html(f"https://news.google.com/rss/articles/{gid}?hl=th&gl=TH&ceid=TH:th", limit=600_000)
     sg = re.search(r'data-n-a-sg="([^"]+)"', page)
     ts = re.search(r'data-n-a-ts="([^"]+)"', page)
     if not sg or not ts:
@@ -355,7 +357,7 @@ def facts_step():
     except Exception as e:
         print("ขอรายการข่าวย่อล้มเหลว:", str(e)[:100])
         return
-    got = ok = bad = g_try = g_ok = 0
+    got = ok = bad = g_try = g_ok = srch = 0
     for it in todo:
         text, via_g = "", "news.google.com" in it["url"]
         try:
@@ -373,9 +375,10 @@ def facts_step():
         try:
             r = call("factsFromText", [it["id"], text])
             ok += 1 if r.get("has") else 0
+            srch += 1 if r.get("has") and r.get("via") == "search" else 0
         except Exception as e:
             print("สรุปข่าวย่อล้มเหลว:", str(e)[:100])
-    print(f"ข่าวย่อ: ขอ {len(todo)} · อ่านเนื้อได้ {got} · สรุปสำเร็จ {ok} · อ่านไม่ได้ {bad} · ลิงก์ Google News {g_ok}/{g_try}")
+    print(f"ข่าวย่อ: ขอ {len(todo)} · อ่านเนื้อได้ {got} · สรุปสำเร็จ {ok} · อ่านไม่ได้ {bad} · ลิงก์ Google News {g_ok}/{g_try} · ค้นเว็บแทน {srch}")
 
 
 def call(fn, args):

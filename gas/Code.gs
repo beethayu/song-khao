@@ -125,6 +125,7 @@ const API = {
   scorePending: scorePending,
   needFacts: needFacts,
   factsFromText: factsFromText,
+  factsNow: factsNow,
   clipSafe: clipSafe,
   retell: retell,
   makePost: makePost,
@@ -333,6 +334,35 @@ function needFacts(limit) {
 }
 
 // text ว่าง = อ่านเนื้อข่าวไม่ได้ ใส่ "-" เพื่อไม่ต้องลองซ้ำ
+// อ่านเนื้อข่าวไม่ได้ (ลิงก์ Google News ฯลฯ) → ให้ Gemini ค้นข่าวเรื่องเดียวกันด้วย Google Search แล้วสรุป
+// คืน '-' ถ้าไม่เจอ/ล้ม (บันทึกสาเหตุล่าสุดไว้ใน Script Properties FACTS_SEARCH_ERR ให้ดูได้)
+function factsSearch_(o) {
+  const d = new Date(Number(o.ts) || Date.now());
+  const q = 'ค้นหาข่าวนี้ด้วย Google Search แล้วเขียนข่าวย่อ\nหัวข้อข่าว: ' + o.title + '\nแหล่งข่าว: ' + (o.source || 'ไม่ระบุ') +
+    '\nวันที่ประมาณ: ' + Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM-dd') +
+    '\nใช้เฉพาะข้อมูลจากข่าวเรื่องเดียวกันนี้ที่ค้นเจอ ห้ามเดาหรือเติมตัวเลข/ชื่อเอง ถ้าค้นไม่เจอข่าวเรื่องนี้ ให้ตอบคำเดียวว่า "ไม่พบ"';
+  try {
+    const t = String(gemini_(FACTS_PROMPT, [{ role: 'user', parts: [{ text: q }] }], 0.2, false, [{ google_search: {} }])).trim();
+    if (t.length >= 25 && t.indexOf('ไม่พบ') !== 0) return t.slice(0, 1800);
+    return '-';
+  } catch (e) {
+    PropertiesService.getScriptProperties().setProperty('FACTS_SEARCH_ERR', String(e.message || e).slice(0, 200));
+    return '-';
+  }
+}
+
+// ปุ่ม "สรุปข่าวนี้" ในแอป: ข่าวที่ยังไม่มีข่าวย่อ หรือเคยสรุปไม่ได้ ("-")
+function factsNow(id) {
+  const sh = sheet_();
+  const o = rows_(sh).filter(function (x) { return x.id === id; })[0];
+  if (!o) throw new Error('ไม่พบข่าวนี้');
+  if (o.facts && o.facts !== '-') return o.facts;
+  const out = factsSearch_(o);
+  sh.getRange(o._row, 16).setValue(out);
+  if (out === '-') throw new Error('หาข่าวย่อไม่ได้ (' + (PropertiesService.getScriptProperties().getProperty('FACTS_SEARCH_ERR') || 'ค้นไม่เจอข่าวนี้') + ')');
+  return out;
+}
+
 function factsFromText(id, text) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -341,14 +371,15 @@ function factsFromText(id, text) {
     const o = rows_(sh).filter(function (x) { return x.id === id; })[0];
     if (!o) return { ok: false };
     const body = String(text || '').trim().slice(0, 7000);
-    let out = '-';
-    if (body.length >= 200) {
+    let out = '-', via = 'text';
+    if (body.length < 200) { out = factsSearch_(o); via = 'search'; }
+    else {
       const q = 'หัวข้อข่าว: ' + (o.title_th || o.title) + '\nแหล่งข่าว: ' + (o.source || 'ไม่ระบุ') + '\n\nเนื้อข่าว:\n' + body;
       const t = String(gemini_(FACTS_PROMPT, [{ role: 'user', parts: [{ text: q }] }], 0.2)).trim();
       if (t.length >= 25) out = t.slice(0, 1800);
     }
     sh.getRange(o._row, 16).setValue(out);
-    return { ok: true, has: out !== '-' };
+    return { ok: true, has: out !== '-', via: via };
   } finally {
     lock.releaseLock();
   }
