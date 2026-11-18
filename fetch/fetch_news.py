@@ -353,7 +353,7 @@ def article_text(url):
 
 def facts_step():
     try:
-        todo = call("needFacts", [12])
+        todo = call("needFacts", [20])
     except Exception as e:
         print("ขอรายการข่าวย่อล้มเหลว:", str(e)[:100])
         return

@@ -352,8 +352,10 @@ function gnResolve_(url) {
     method: 'post', muteHttpExceptions: true, contentType: 'application/x-www-form-urlencoded;charset=UTF-8',
     headers: { 'User-Agent': BROWSER_UA_ }, payload: 'f.req=' + encodeURIComponent(JSON.stringify([[['Fbv4je', inner]]]))
   }).getContentText();
-  const parsed = JSON.parse(res.split('\n\n')[1]);
-  return JSON.parse(parsed[0][2])[1];
+  const mm = /garturlres\\",\\"(https?:[^"]+?)\\"/.exec(res);
+  if (mm) return mm[1].replace(/\\+u003d/g, '=').replace(/\\+u0026/g, '&').replace(/\\+\//g, '/').replace(/\\+$/, '');
+  try { const parsed = JSON.parse(res.split('\n\n')[1]); const u = JSON.parse(parsed[0][2])[1]; if (u) return u; } catch (e) { /* ignore */ }
+  throw new Error('Google News ไม่คืนลิงก์ (' + res.length + ' ตัวอักษร)');
 }
 function pageText_(url) {
   const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': BROWSER_UA_, 'Accept-Language': 'th,en;q=0.8' } });
