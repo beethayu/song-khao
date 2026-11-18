@@ -344,6 +344,7 @@ function factsSearch_(o) {
   try {
     const t = String(gemini_(FACTS_PROMPT, [{ role: 'user', parts: [{ text: q }] }], 0.2, false, [{ google_search: {} }])).trim();
     if (t.length >= 25 && t.indexOf('ไม่พบ') !== 0) return t.slice(0, 1800);
+    PropertiesService.getScriptProperties().setProperty('FACTS_SEARCH_ERR', 'ค้นไม่เจอ: ' + t.slice(0, 60));
     return '-';
   } catch (e) {
     PropertiesService.getScriptProperties().setProperty('FACTS_SEARCH_ERR', String(e.message || e).slice(0, 200));
@@ -372,14 +373,14 @@ function factsFromText(id, text) {
     if (!o) return { ok: false };
     const body = String(text || '').trim().slice(0, 7000);
     let out = '-', via = 'text';
-    if (body.length < 200) { out = factsSearch_(o); via = 'search'; }
+    if (body.length < 200) { PropertiesService.getScriptProperties().deleteProperty('FACTS_SEARCH_ERR'); out = factsSearch_(o); via = 'search'; }
     else {
       const q = 'หัวข้อข่าว: ' + (o.title_th || o.title) + '\nแหล่งข่าว: ' + (o.source || 'ไม่ระบุ') + '\n\nเนื้อข่าว:\n' + body;
       const t = String(gemini_(FACTS_PROMPT, [{ role: 'user', parts: [{ text: q }] }], 0.2)).trim();
       if (t.length >= 25) out = t.slice(0, 1800);
     }
     sh.getRange(o._row, 16).setValue(out);
-    return { ok: true, has: out !== '-', via: via };
+    return { ok: true, has: out !== '-', via: via, err: out === '-' && via === 'search' ? (PropertiesService.getScriptProperties().getProperty('FACTS_SEARCH_ERR') || '') : '' };
   } finally {
     lock.releaseLock();
   }

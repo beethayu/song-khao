@@ -376,6 +376,8 @@ def facts_step():
             r = call("factsFromText", [it["id"], text])
             ok += 1 if r.get("has") else 0
             srch += 1 if r.get("has") and r.get("via") == "search" else 0
+            if r.get("err"):
+                print("ค้นเว็บแทนไม่ได้:", str(r["err"])[:90])
         except Exception as e:
             print("สรุปข่าวย่อล้มเหลว:", str(e)[:100])
     print(f"ข่าวย่อ: ขอ {len(todo)} · อ่านเนื้อได้ {got} · สรุปสำเร็จ {ok} · อ่านไม่ได้ {bad} · ลิงก์ Google News {g_ok}/{g_try} · ค้นเว็บแทน {srch}")
