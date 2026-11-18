@@ -1,40 +1,22 @@
-import urllib.request, xml.etree.ElementTree as ET, re
+import urllib.request, urllib.parse, xml.etree.ElementTree as ET, re
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-C = """thaipbs https://www.thaipbs.or.th/rss/news
-thaipbs2 https://www.thaipbs.or.th/rss
-bkkbiz https://www.bangkokbiznews.com/rss/feed/news
-bkkbiz2 https://www.bangkokbiznews.com/rss
-than https://www.thansettakij.com/rss/feed/news
-than2 https://www.thansettakij.com/rss
-pracha https://www.prachachat.net/feed
-mgr https://mgronline.com/rss/latest
-mgr2 https://mgronline.com/rss
-siamrath https://siamrath.co.th/rss.xml
-naewna https://www.naewna.com/rss.php
-komchad https://www.komchadluek.net/rss
-nation https://www.nationtv.tv/rss
-nation2 https://www.nationthailand.com/rss
-tna https://tna.mcot.net/feed
-tnn https://www.tnnthailand.com/rss
-pptv https://www.pptvhd36.com/rss/news
-amarin https://www.amarintv.com/rss
-ch7 https://news.ch7.com/rss
-ch3 https://ch3plus.com/news/rss
-thairath https://www.thairath.co.th/rss/news
-dailynews https://www.dailynews.co.th/rss/
-hfocus https://www.hfocus.org/rss.xml
-tmd https://www.tmd.go.th/api/xml/rss
-prd https://www.prd.go.th/th/rss
-moac https://www.moac.go.th/rss
-ocsb https://www.ocsb.go.th/feed/
-""".split("\n")
-for line in C:
-    if not line.strip(): continue
-    n, u = line.split()
+def get(u):
+    return urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": UA, "Accept": "*/*", "Accept-Language": "th,en;q=0.8"}), timeout=20).read(3_000_000)
+for q in ["อ้อย ชาวไร่", "กรมอุตุนิยมวิทยา เตือน", "ธ.ก.ส. เกษตรกร", "ราคาน้ำมัน", "เงินช่วยเหลือ ลงทะเบียน"]:
+    u = "https://www.bing.com/news/search?" + urllib.parse.urlencode({"q": q, "format": "rss", "setlang": "th", "cc": "TH", "qft": "sortbydate=\"1\""})
     try:
-        b = urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": UA, "Accept": "*/*"}), timeout=20).read(3_000_000)
-        r = ET.fromstring(b); its = list(r.iter("item")) or list(r.iter("{http://www.w3.org/2005/Atom}entry"))
-        l = (its[0].findtext("link") or "") if its else ""
-        print(f"OK {n} {len(its)} {l[:70]}")
+        r = ET.fromstring(get(u)); its = list(r.iter("item"))
+        print(f"BING {q}: {len(its)}")
+        ok = 0
+        for it in its[:6]:
+            l = it.findtext("link") or ""
+            real = urllib.parse.parse_qs(urllib.parse.urlparse(l).query).get("url", [l])[0]
+            src = it.findtext("{https://www.bing.com/news/search?q=" + "}Source") or ""
+            pd = it.findtext("pubDate") or ""
+            try:
+                h = get(real).decode("utf-8", "ignore"); n = len(re.findall(r"<p[^>]*>", h)); st = f"read p={n}"
+            except Exception as e:
+                st = "readfail " + type(e).__name__ + str(e)[:30]
+            print("   ", urllib.parse.urlparse(real).netloc, pd[:16], st)
     except Exception as e:
-        print(f"NO {n} {type(e).__name__} {str(e)[:50]}")
+        print(f"BING {q}: FAIL {type(e).__name__} {str(e)[:60]}")
