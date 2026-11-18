@@ -94,6 +94,8 @@ def gnews(query, region, hl, gl, ceid, label, limit=25, tag=None):
         src = (it.findtext("source") or "").strip()
         if src and title.endswith(" - " + src):
             title = title[: -len(src) - 3]
+        if re.search(r"trueid|ทรูไอดี", src, re.I):  # เปิดบนมือถือแล้วบังคับไปอ่านต่อในแอป TrueID อ่านเต็มไม่ได้ (ผู้ใช้แจ้ง 2026-11-18)
+            continue
         out.append(dict(
             id=mid(region, title), region=region, title=title, source=src,
             url=(it.findtext("link") or "").strip(), raw=max(50 - i, 1), metric=label,

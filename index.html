@@ -136,8 +136,8 @@ body[data-tab=chat] #toast{bottom:calc(var(--nav) + env(safe-area-inset-bottom) 
 <script>
 (function(){
 'use strict';
-var VERSION='8.6 · 2026-11-18';
-var WHATSNEW='ปุ่มสรุปข่าวนี้ สำหรับข่าวที่ยังไม่มีข่าวย่อ';
+var VERSION='8.7 · 2026-11-18';
+var WHATSNEW='ไม่เอาข่าวจาก TrueID (อ่านเต็มไม่ได้)';
 var CLIP=false; // ปิดลุงเล่า+คำสั่งทำคลิป (ผู้ใช้ไม่ว่างทำคลิป 2026-11-15) เปลี่ยนเป็น true เพื่อเปิดกลับ
 var DEFAULT_URL='';
 var $=function(s){return document.querySelector(s)};
@@ -183,6 +183,7 @@ function sameNews(a,b){
 function dedup(list){
   var out=[];
   list.forEach(function(it){
+    if(/trueid|ทรูไอดี/i.test((it.source||'')+' '+(it.url||'').replace(/news\.google\.com\S*/,'')))return; // TrueID อ่านเต็มบนมือถือไม่ได้ (บังคับเข้าแอป)
     for(var i=0;i<out.length;i++)if(sameNews(out[i],it)){if(srcRank(it)<srcRank(out[i]))out[i]=it;return}
     out.push(it);
   });

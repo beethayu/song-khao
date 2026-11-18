@@ -228,3 +228,6 @@ Script ID ใส่ Secret `SCRIPT_ID` + `CLASPRC_JSON` (รูปแบบ toke
 - fetch_news.py: ถอดลิงก์ Google News ด้วยคุกกี้ยินยอม (CONSENT/SOCS) + URL rss/articles?hl=th · log เพิ่ม "ค้นเว็บแทน N"
 - **แก้ไขหลังทดสอบจริง (2026-11-18 12:30)**: Gemini ค้นเว็บ (google_search) ใช้ไม่ได้ โควตาฟรี = 0 (429) → เลิกใช้ · `factsSearch_` เปลี่ยนเป็นให้ Apps Script (เครื่อง Google) ถอดลิงก์ Google News เอง (`gnResolve_`: หน้า rss/articles หา data-n-a-sg/ts → batchexecute → regex `garturlres`) แล้วอ่านเนื้อ (`pageText_`: og:description + <p>) แล้วสรุปด้วย FACTS_PROMPT · Actions ไม่ถอดลิงก์ Google News เองแล้ว (ส่งข้อความว่าง) เว้น 3 วิ/ข่าว · needFacts 20 ข่าว/รอบ
 - ผลจริง: ก่อนแก้ 2–3/12 ต่อรอบ → หลังแก้ 13/20 · ที่เหลือ Google ตอบหน้า "ทราฟฟิกผิดปกติ" (จำกัดความถี่) หรือเว็บข่าว 403 → ปุ่ม "สรุปข่าวนี้" ในแอปลองซ้ำได้
+
+## v8.7 (2026-11-18 13:30) ตัดข่าว TrueID
+- ผู้ใช้: "ของ true id เข้าไปอ่านข่าวเต็มไม่ได้" (เว็บ TrueID บนมือถือบังคับไปอ่านต่อในแอป) → fetch_news.py `gnews()` ข้ามข่าวที่ source เป็น TrueID · แอป `dedup()` ซ่อนข่าว TrueID ที่ค้างในชีต · ถ้าอยากได้คืน ลบ 2 จุดนี้
